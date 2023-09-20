@@ -1,19 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace SQLServerInteraction
+﻿namespace SQLServerInteraction
 {
     public partial class SQLServerInstance
     {
         [AttributeUsage(AttributeTargets.Property, AllowMultiple = false)]
-        internal class ColumnAttribute : Attribute
+        public class ColumnAttribute : Attribute
         {
-            internal string Name { get; }
+            public string Name { get; }
 
-            internal ColumnAttribute(string name)
+            public ColumnAttribute(string name)
             {
                 Name = name;
             }

@@ -24,9 +24,11 @@ namespace SQLServerInteraction
                 {
                     var attribute = Attribute.GetCustomAttribute(property, typeof(ColumnAttribute)) as ColumnAttribute;
 
-                    if (attribute != null && !string.IsNullOrEmpty(attribute.Name) && reader[attribute.Name] != DBNull.Value)
+                    string columnName = attribute != null ? attribute.Name : property.Name;
+
+                    if (reader[columnName] != DBNull.Value)
                     {
-                        property.SetValue(obj, Convert.ChangeType(reader[attribute.Name], property.PropertyType));
+                        property.SetValue(obj, Convert.ChangeType(reader[columnName], property.PropertyType));
                     }
                 }
 
