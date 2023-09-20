@@ -1,12 +1,3 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace SQLServerInteraction
-{
-    class ReadMe
-    {
-    }
-}
+﻿This project wraps the Microsoft.Data.SqlClient library to enhance interaction with a SQL Server database. These functions cover essential tasks like optimizing data transfer from a DataTable to a designated database table using bulk copying, executing SQL queries to consolidate data into a DataTable, extracting values from SQL queries, and executing non-query SQL statements.  
+  
+https://github.com/WilliamSmithEdward/SQLServerInteraction
