@@ -4,30 +4,35 @@ namespace SQLServerInteraction
 {
     public partial class SQLServerInstance
     {
-        public async Task<List<T>> ExecuteQueryToObjectListTAsync<T>(string sql) where T : new()
+        public async Task<List<T>> ExecuteQueryToObjectListAsync<T>(string sql) where T : new()
         {
             var results = new List<T>();
 
-            using var connection = new SqlConnection(_connectionString);
-            await connection.OpenAsync();
-
-            using var command = new SqlCommand(sql, connection);
-            using var reader = await command.ExecuteReaderAsync();
-
-            while (await reader.ReadAsync())
+            using (var connection = new SqlConnection(_connectionString))
             {
-                var obj = new T();
-                var properties = typeof(T).GetProperties();
+                await connection.OpenAsync();
 
-                foreach (var property in properties)
+                using (var command = new SqlCommand(sql, connection))
+                using (var reader = await command.ExecuteReaderAsync())
                 {
-                    if (reader[property.Name] != DBNull.Value)
+                    while (await reader.ReadAsync())
                     {
-                        property.SetValue(obj, Convert.ChangeType(reader[property.Name], property.PropertyType));
+                        var obj = new T();
+                        var properties = typeof(T).GetProperties();
+
+                        foreach (var property in properties)
+                        {
+                            var attribute = Attribute.GetCustomAttribute(property, typeof(ColumnAttribute)) as ColumnAttribute;
+
+                            if (attribute != null && !string.IsNullOrEmpty(attribute.Name) && reader[attribute.Name] != DBNull.Value)
+                            {
+                                property.SetValue(obj, Convert.ChangeType(reader[attribute.Name], property.PropertyType));
+                            }
+                        }
+
+                        results.Add(obj);
                     }
                 }
-
-                results.Add(obj);
             }
 
             return results;
