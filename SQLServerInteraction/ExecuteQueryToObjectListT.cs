@@ -5,7 +5,7 @@ namespace SQLServerInteraction
 
     public partial class SQLServerInstance
     {
-        public List<T> ExecuteQueryToObjectList<T>(string sql) where T : new()
+        public List<T> ExecuteQueryToObjectListT<T>(string sql) where T : new()
         {
             var results = new List<T>();
 
