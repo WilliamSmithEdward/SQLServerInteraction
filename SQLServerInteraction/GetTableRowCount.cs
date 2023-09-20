@@ -2,7 +2,7 @@
 
 namespace SQLServerInteraction
 {
-    public partial class SQLServerInteraction
+    public partial class SQLServerInstance
     {
         public int GetTableRowCount(string tableName)
         {

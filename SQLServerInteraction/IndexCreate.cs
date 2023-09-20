@@ -1,6 +1,6 @@
 ﻿namespace SQLServerInteraction
 {
-    public partial class SQLServerInteraction
+    public partial class SQLServerInstance
     {
         public void IndexCreate(string tableName, string columnName)
         {

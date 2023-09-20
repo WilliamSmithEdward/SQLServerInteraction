@@ -2,7 +2,7 @@
 
 namespace SQLServerInteraction
 {
-    public partial class SQLServerInteraction
+    public partial class SQLServerInstance
     {
         public void InsertData(string sqlServerTableName, Dictionary<string, object> values)
         {

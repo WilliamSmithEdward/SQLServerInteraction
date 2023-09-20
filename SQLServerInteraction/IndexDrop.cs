@@ -1,6 +1,6 @@
 ﻿namespace SQLServerInteraction
 {
-    public partial class SQLServerInteraction
+    public partial class SQLServerInstance
     {
         public void IndexDrop(string tableName, string indexName)
         {

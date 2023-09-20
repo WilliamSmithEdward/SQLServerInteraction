@@ -2,7 +2,7 @@
 
 namespace SQLServerInteraction
 {
-    public partial class SQLServerInteraction
+    public partial class SQLServerInstance
     {
         public async Task<List<T>> ExecuteQueryToObjectListTAsync<T>(string sql) where T : new()
         {

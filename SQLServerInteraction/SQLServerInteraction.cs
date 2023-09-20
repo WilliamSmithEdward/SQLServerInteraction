@@ -1,10 +1,10 @@
 ﻿namespace SQLServerInteraction
 {
-    public partial class SQLServerInteraction
+    public partial class SQLServerInstance
     {
         private string _connectionString;
 
-        public SQLServerInteraction(string connectionString)
+        public SQLServerInstance(string connectionString)
         {
             _connectionString = connectionString;
         }
