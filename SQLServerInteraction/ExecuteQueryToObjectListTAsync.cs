@@ -4,7 +4,7 @@ namespace SQLServerInteraction
 {
     public partial class SQLServerInstance
     {
-        public async Task<List<T>> ExecuteQueryToObjectListAsync<T>(string sql) where T : new()
+        public async Task<List<T>> ExecuteQueryToObjectListTAsync<T>(string sql) where T : new()
         {
             var results = new List<T>();
 
