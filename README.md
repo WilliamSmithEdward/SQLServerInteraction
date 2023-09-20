@@ -60,6 +60,16 @@ Executes a SQL query and maps the results to a list of objects.
 ### ExecuteQueryToObjectListTAsync
 Async version: Executes a SQL query and maps the results to a list of objects of a specified type.
 
+#### Note: ExecuteQueryToObjectList logic supports mapping properties to attributes like below. If no attribute is specified, then the logic will attempt to map directly to the property name.
+
+```csharp
+public class YourClass
+{
+    [SQLServerInstance.Column("Your Column")]   
+    public string? YourColumn { get; set; }
+}
+```
+
 ### ExecuteScalarT
 Executes a SQL query and returns a scalar result of a specified type.
 
