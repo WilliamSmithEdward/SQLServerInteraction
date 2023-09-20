@@ -2,7 +2,7 @@
 
 namespace SQLServerInteraction
 {
-    public partial class SQLServerInteraction
+    public partial class SQLServerInstance
     {
         public List<T> ExecuteQueryToObjectListT<T>(string sql) where T : new()
         {

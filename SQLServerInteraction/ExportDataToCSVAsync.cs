@@ -4,7 +4,7 @@ using System.Text.Json;
 
 namespace SQLServerInteraction
 {
-    public partial class SQLServerInteraction
+    public partial class SQLServerInstance
     {
         public async Task ExportDataToCSVAsync(string destinationFilePath, string sourceTableName)
         {

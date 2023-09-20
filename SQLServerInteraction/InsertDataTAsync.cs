@@ -2,7 +2,7 @@
 
 namespace SQLServerInteraction
 {
-    public partial class SQLServerInteraction
+    public partial class SQLServerInstance
     {
         public async Task InsertDataAsync<T>(T data, string sqlServerTableName) where T : class
         {

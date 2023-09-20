@@ -4,7 +4,7 @@ using System.Text;
 
 namespace SQLServerInteraction
 {
-    public partial class SQLServerInteraction
+    public partial class SQLServerInstance
     {
         public async Task ExportDataToXLSXAsync(string destinationFilePath, DataTable dataTable)
         {

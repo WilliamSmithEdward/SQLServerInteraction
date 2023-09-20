@@ -2,7 +2,7 @@
 
 namespace SQLServerInteraction
 {
-    public partial class SQLServerInteraction
+    public partial class SQLServerInstance
     {
         public async Task ExecuteNonQueryWithParametersAsync(string sql, Dictionary<string, object> parameters)
         {

@@ -3,7 +3,7 @@ using System.Data;
 
 namespace SQLServerInteraction
 {
-    public partial class SQLServerInteraction
+    public partial class SQLServerInstance
     {
         public async Task ExecuteStoredProcedureAsync(string storedProcedureName, SqlParameter[]? parameters = null)
         {
