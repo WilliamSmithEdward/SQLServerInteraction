@@ -1,0 +1,35 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+	<Deterministic>false</Deterministic>
+	<AssemblyVersion>1.0.0</AssemblyVersion>
+	<PackageVersion>1.0.0</PackageVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+	<PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+	<None Include="README.md" Pack="true" PackagePath="\">
+	  <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	</None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="5.1.1" />
+  </ItemGroup>
+
+  <PropertyGroup>
+	<TargetFramework>net7.0</TargetFramework>
+	<ImplicitUsings>enable</ImplicitUsings>
+	<Nullable>enable</Nullable>
+	<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+	<Title>SQLServerInteraction</Title>
+	<Copyright>William Smith (WilliamSmithE)</Copyright>
+	<Description>SQLServerInteraction is a .Net library that wraps the functionality included in Microsoft's "Microsoft.Data.SqlClient" library.</Description>
+	<PackageProjectUrl>https://github.com/WilliamSmithEdward/SQLServerInteraction</PackageProjectUrl>
+	<RepositoryUrl></RepositoryUrl>
+  </PropertyGroup>
+
+</Project>
