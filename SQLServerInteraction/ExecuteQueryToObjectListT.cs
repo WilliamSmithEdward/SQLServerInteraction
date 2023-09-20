@@ -2,9 +2,10 @@
 
 namespace SQLServerInteraction
 {
+
     public partial class SQLServerInstance
     {
-        public List<T> ExecuteQueryToObjectListT<T>(string sql) where T : new()
+        public List<T> ExecuteQueryToObjectList<T>(string sql) where T : new()
         {
             var results = new List<T>();
 
@@ -21,9 +22,11 @@ namespace SQLServerInteraction
 
                 foreach (var property in properties)
                 {
-                    if (reader[property.Name] != DBNull.Value)
+                    var attribute = Attribute.GetCustomAttribute(property, typeof(ColumnAttribute)) as ColumnAttribute;
+
+                    if (attribute != null && !string.IsNullOrEmpty(attribute.Name) && reader[attribute.Name] != DBNull.Value)
                     {
-                        property.SetValue(obj, Convert.ChangeType(reader[property.Name], property.PropertyType));
+                        property.SetValue(obj, Convert.ChangeType(reader[attribute.Name], property.PropertyType));
                     }
                 }
 
@@ -32,5 +35,5 @@ namespace SQLServerInteraction
 
             return results;
         }
-    }
+    }    
 }
