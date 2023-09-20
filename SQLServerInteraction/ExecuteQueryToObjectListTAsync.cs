@@ -12,25 +12,28 @@ namespace SQLServerInteraction
             {
                 await connection.OpenAsync();
 
-                using var command = new SqlCommand(sql, connection);
-                using var reader = await command.ExecuteReaderAsync();
-                
-                while (await reader.ReadAsync())
+                using (var command = new SqlCommand(sql, connection))
+                using (var reader = await command.ExecuteReaderAsync())
                 {
-                    var obj = new T();
-                    var properties = typeof(T).GetProperties();
-
-                    foreach (var property in properties)
+                    while (await reader.ReadAsync())
                     {
-                        var attribute = Attribute.GetCustomAttribute(property, typeof(ColumnAttribute)) as ColumnAttribute;
+                        var obj = new T();
+                        var properties = typeof(T).GetProperties();
 
-                        if (attribute != null && !string.IsNullOrEmpty(attribute.Name) && reader[attribute.Name] != DBNull.Value)
+                        foreach (var property in properties)
                         {
-                            property.SetValue(obj, Convert.ChangeType(reader[attribute.Name], property.PropertyType));
-                        }
-                    }
+                            var attribute = Attribute.GetCustomAttribute(property, typeof(ColumnAttribute)) as ColumnAttribute;
 
-                    results.Add(obj);
+                            string columnName = attribute != null ? attribute.Name : property.Name;
+
+                            if (reader[columnName] != DBNull.Value)
+                            {
+                                property.SetValue(obj, Convert.ChangeType(reader[columnName], property.PropertyType));
+                            }
+                        }
+
+                        results.Add(obj);
+                    }
                 }
             }
 
