@@ -2,8 +2,8 @@
 
   <PropertyGroup>
 	<Deterministic>false</Deterministic>
-	<AssemblyVersion>1.0.5</AssemblyVersion>
-	<PackageVersion>1.0.5</PackageVersion>
+	<AssemblyVersion>1.0.7</AssemblyVersion>
+	<PackageVersion>1.0.7</PackageVersion>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -27,9 +27,13 @@
 	<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 	<Title>SQLServerInteraction</Title>
 	<Copyright>William Smith (WilliamSmithE)</Copyright>
-	<Description>SQLServerInteraction is a .Net library that wraps the functionality included in Microsoft's "Microsoft.Data.SqlClient" library.</Description>
+	<Description>SQLServerInteraction is a .Net library that wraps the functionality included in Microsoft's "Microsoft.Data.SqlClient" library. SQL Server • Wrapper • SqlClient • Async</Description>
 	<PackageProjectUrl>https://github.com/WilliamSmithEdward/SQLServerInteraction</PackageProjectUrl>
 	<RepositoryUrl></RepositoryUrl>
+  </PropertyGroup>
+	
+  <PropertyGroup>
+	<PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
 </Project>
