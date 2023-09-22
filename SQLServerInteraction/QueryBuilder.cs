@@ -167,6 +167,21 @@ namespace SQLServerInteraction
             _caseStatement = string.Empty;
         }
 
+        public void Union()
+        {
+            _isUnion = true;
+        }
+
+        public void Intersect()
+        {
+            _isIntersect = true;
+        }
+
+        public void Except()
+        {
+            _isExcept = true;
+        }
+
         public QueryBuildResult Build()
         {
             if (!_query.ToString().ToUpper().Contains("SELECT") || !_query.ToString().ToUpper().Contains("FROM"))
