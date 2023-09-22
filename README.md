@@ -66,10 +66,10 @@ string query = queryBuilder.Build().SQL;
 #### Aggregates (SUM, COUNT, AVG, MIN, MAX)
 ```csharp
 var queryBuilder = new QueryBuilder();
-queryBuilder.Select("*");
+queryBuilder.Select();
+queryBuilder.Count("Revenue", "CountOfRevenue")
 queryBuilder.From("Sales");
-
-queryBuilder.Select("SUM(Amount) AS TotalSales");
+queryBuilder.Count("Orders");
 queryBuilder.Build();
 ```
 
