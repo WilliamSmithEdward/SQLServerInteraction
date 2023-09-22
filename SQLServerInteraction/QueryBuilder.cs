@@ -1,5 +1,4 @@
-﻿using Microsoft.Data.SqlClient;
-using System.Text;
+﻿using System.Text;
 
 namespace SQLServerInteraction
 {
