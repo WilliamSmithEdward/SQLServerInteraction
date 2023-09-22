@@ -34,7 +34,7 @@ namespace SQLServerInteraction
             _caseStatement = string.Empty;
         }
 
-        public void Select(string columns)
+        public void Select(string columns = "")
         {
             _query.Append($"SELECT {columns} ");
         }
@@ -80,29 +80,29 @@ namespace SQLServerInteraction
             _query.Append($"GROUP BY {columns} ");
         }
 
-        public void Count(string columnName)
+        public void Count(string columnName, string alias)
         {
-            _query.Append($"COUNT({columnName}) ");
+            _query.Append($"COUNT({columnName}) AS {alias}");
         }
 
-        public void Sum(string columnName)
+        public void Sum(string columnName, string alias)
         {
-            _query.Append($"SUM({columnName}) ");
+            _query.Append($"SUM({columnName}) AS {alias}");
         }
 
-        public void Avg(string columnName)
+        public void Avg(string columnName, string alias)
         {
-            _query.Append($"AVG({columnName}) ");
+            _query.Append($"AVG({columnName}) AS {alias}");
         }
 
-        public void Min(string columnName)
+        public void Min(string columnName, string alias)
         {
-            _query.Append($"MIN({columnName}) ");
+            _query.Append($"MIN({columnName}) AS {alias}");
         }
 
-        public void Max(string columnName)
+        public void Max(string columnName, string alias)
         {
-            _query.Append($"MAX({columnName}) ");
+            _query.Append($"MAX({columnName}) AS {alias}" );
         }
 
         public QueryBuilder CreateSubquery()
