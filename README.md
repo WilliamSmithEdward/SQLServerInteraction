@@ -53,13 +53,12 @@ queryBuilder.Where("TotalAmount > (SELECT AVG(TotalAmount) FROM Orders)");
 string query = queryBuilder.Build().SQL;
 ```
 
-#### Aggregate: Group By / Having
+#### Aggregate: Group By
 ```csharp
 var queryBuilder = new QueryBuilder();
 queryBuilder.Select("Category, COUNT(*) AS TotalProducts");
 queryBuilder.From("Products");
 queryBuilder.GroupBy("Category");
-queryBuilder.Having("COUNT(*) > 10");
 
 string query = queryBuilder.Build().SQL;
 ```
