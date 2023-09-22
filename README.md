@@ -116,7 +116,7 @@ queryBuilder.AddParameter("MaxAge", 50);
 string query = queryBuilder.Build().SQL;
 ```
 
-#### Cast Statement
+#### Case Statement
 ```csharp
 var queryBuilder = new QueryBuilder();
 queryBuilder.Select("FirstName, LastName");
