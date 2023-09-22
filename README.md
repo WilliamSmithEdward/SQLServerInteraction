@@ -53,7 +53,7 @@ queryBuilder.Where("TotalAmount > (SELECT AVG(TotalAmount) FROM Orders)");
 string query = queryBuilder.Build().SQL;
 ```
 
-#### Group By / Aggregate
+#### Group By
 ```csharp
 var queryBuilder = new QueryBuilder();
 queryBuilder.Select("Category, COUNT(*) AS TotalProducts");
@@ -61,6 +61,16 @@ queryBuilder.From("Products");
 queryBuilder.GroupBy("Category");
 
 string query = queryBuilder.Build().SQL;
+```
+
+#### Aggregates (SUM, COUNT, AVG, MIN, MAX)
+```csharp
+var queryBuilder = new QueryBuilder();
+queryBuilder.Select("*");
+queryBuilder.From("Sales");
+
+queryBuilder.Select("SUM(Amount) AS TotalSales");
+queryBuilder.Build();
 ```
 
 #### Parameters
