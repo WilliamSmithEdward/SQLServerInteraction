@@ -5,6 +5,11 @@ namespace SQLServerInteraction
 {
     public partial class SQLServerInstance
     {
+        /// <summary>
+        /// Retrieves the column names for a specified table in the SQL Server database.
+        /// </summary>
+        /// <param name="tableName">The name of the table for which to retrieve column names.</param>
+        /// <returns>A list of column names for the specified table.</returns>
         public List<string> GetColumnNames(string tableName)
         {
             using var connection = new SqlConnection(_connectionString);
@@ -21,6 +26,5 @@ namespace SQLServerInteraction
 
             return columns;
         }
-
     }
 }

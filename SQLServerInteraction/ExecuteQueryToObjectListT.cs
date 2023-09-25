@@ -2,10 +2,15 @@
 
 namespace SQLServerInteraction
 {
-
     public partial class SQLServerInstance
     {
-        public List<T> ExecuteQueryToObjectListT<T>(string sql) where T : new()
+        /// <summary>
+        /// Executes a SQL query and maps the result set to a list of objects of type T.
+        /// </summary>
+        /// <typeparam name="T">The type of objects to create and populate from the query result.</typeparam>
+        /// <param name="sql">The SQL query to execute.</param>
+        /// <returns>A list of objects of type T populated with data from the query result.</returns>
+        public List<T> ExecuteQueryToObjectList<T>(string sql) where T : new()
         {
             var results = new List<T>();
 
