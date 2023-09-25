@@ -5,6 +5,11 @@ namespace SQLServerInteraction
 {
     public partial class SQLServerInstance
     {
+        /// <summary>
+        /// Asynchronously executes a SQL query and returns the results as a DataTable.
+        /// </summary>
+        /// <param name="sql">The SQL query to execute.</param>
+        /// <returns>A DataTable containing the results of the query.</returns>
         public async Task<DataTable> ExecuteQueryAsync(string sql)
         {
             var dataTable = new DataTable();

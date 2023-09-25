@@ -4,6 +4,12 @@ namespace SQLServerInteraction
 {
     public partial class SQLServerInstance
     {
+        /// <summary>
+        /// Asynchronously executes a SQL query and returns the results as a list of specified type <typeparamref name="T"/>.
+        /// </summary>
+        /// <typeparam name="T">The type of objects to retrieve from the query results.</typeparam>
+        /// <param name="sql">The SQL query to execute.</param>
+        /// <returns>A task representing the asynchronous operation that returns a list of objects of type <typeparamref name="T"/> containing the results of the query.</returns>
         public async Task<List<T>> ExecuteQueryAsync<T>(string sql)
         {
             var results = new List<T>();

@@ -4,19 +4,28 @@ namespace SQLServerInteraction
 {
     public partial class SQLServerInstance
     {
-        public void UpdateData(string sqlServerTableName, Dictionary<string, object> valuesToUpdate, string condition)
+        /// <summary>
+        /// Updates records in a SQL Server table.
+        /// </summary>
+        /// <param name="sqlServerTableName">The name of the SQL Server table to update.</param>
+        /// <param name="valuesToUpdate">A dictionary containing column names and their corresponding values to update. "[My Field]" is OK.</param>
+        /// <param name="condition">An optional condition to filter which records to update. Defaults to "1 = 1" if not provided.</param>
+        public void UpdateData(string sqlServerTableName, Dictionary<string, object> valuesToUpdate, string condition = "")
         {
+            string setClause = string.Join(", ", valuesToUpdate.Select(kvp => $"{kvp.Key} = @{kvp.Key.Replace(" ", "_").Replace("[","").Replace("]","")}"));
+            if (string.IsNullOrEmpty(condition)) condition = "1 = 1";
+            string sql = $"UPDATE {sqlServerTableName} SET {setClause} WHERE {condition}";
+
             using var connection = new SqlConnection(_connectionString);
             connection.Open();
 
-            string updates = string.Join(", ", valuesToUpdate.Select(kvp => $"{kvp.Key} = @{kvp.Key}"));
-            string sql = $"UPDATE {sqlServerTableName} SET {updates} WHERE {condition}";
-
             using var command = new SqlCommand(sql, connection);
+
+            Console.WriteLine(sql);
 
             foreach (var kvp in valuesToUpdate)
             {
-                command.Parameters.AddWithValue("@" + kvp.Key, kvp.Value);
+                command.Parameters.AddWithValue("@" + kvp.Key.Replace(" ", "_").Replace("[","").Replace("]",""), kvp.Value);
             }
 
             command.ExecuteNonQuery();
