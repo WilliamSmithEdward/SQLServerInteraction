@@ -54,10 +54,10 @@ Executes a SQL query and maps the results to a specified type.
 ### ExecuteQueryTAsync
 Async version: Executes a SQL query and maps the results to a specified type.
 
-### ExecuteQueryToObjectListT
+### ExecuteQueryToObjectList
 Executes a SQL query and maps the results to a list of objects.
 
-### ExecuteQueryToObjectListTAsync
+### ExecuteQueryToObjectListAsync
 Async version: Executes a SQL query and maps the results to a list of objects of a specified type.
 
 #### Note: ExecuteQueryToObjectList logic supports mapping properties to attributes like below. If no attribute is specified, then the logic will attempt to map directly to the property name.
