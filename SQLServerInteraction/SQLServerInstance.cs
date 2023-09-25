@@ -8,5 +8,10 @@
         {
             _connectionString = connectionString;
         }
+
+        public SQLServerInstance(SQLServerConnectionString connectionString)
+        {
+            _connectionString = connectionString.GetConnectionString();
+        }
     }
 }
