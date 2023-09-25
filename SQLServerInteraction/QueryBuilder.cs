@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 namespace SQLServerInteraction
 {
@@ -45,7 +46,8 @@ namespace SQLServerInteraction
         /// <param name="columns">A comma-separated list of column names. Leave empty for selecting all columns.</param>
         public void Select(string columns = "")
         {
-            _query.Append($"SELECT {columns} ");
+            if (columns.IsNullOrEmpty()) _query.Append($"SELECT * ");
+            else _query.Append($"SELECT {columns} ");
         }
 
         /// <summary>
