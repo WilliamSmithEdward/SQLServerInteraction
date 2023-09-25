@@ -1,0 +1,1 @@
+dotnet nuget push "C:\Users\willi\source\repos\SQLServerInteraction\SQLServerInteraction\bin\Release\SQLServerInteraction.1.0.10.nupkg" --api-key [key] --source https://api.nuget.org/v3/index.json
