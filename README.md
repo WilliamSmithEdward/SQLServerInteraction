@@ -100,9 +100,6 @@ Async version: Executes a series of SQL commands as a transaction.
 ### ExportDataToCSVAsync
 Async version: Exports data from the SQL Server to a CSV file.
 
-### ExportDataToXLSXAsync
-Async version: Exports data from the SQL Server to an XLSX file.
-
 ### GetColumnNames
 Retrieves the column names of a specific table in the SQL Server database.
 
