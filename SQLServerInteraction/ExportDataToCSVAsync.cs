@@ -1,19 +1,24 @@
 ﻿using Microsoft.Data.SqlClient;
 using System.Data;
+using System.Text;
 using System.Text.Json;
 
 namespace SQLServerInteraction
 {
     public partial class SQLServerInstance
     {
-        public async Task ExportDataToCSVAsync(string destinationFilePath, string sourceTableName)
+        /// <summary>
+        /// Asynchronously exports data from a SQL query to a CSV file.
+        /// </summary>
+        /// <param name="destinationFilePath">The file path where the CSV data will be saved.</param>
+        /// <param name="sql">The SQL query to retrieve data for export.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        public async Task ExportDataToCSVAsync(string destinationFilePath, string sql)
         {
             try
             {
                 using var connection = new SqlConnection(_connectionString);
                 await connection.OpenAsync();
-
-                string sql = $"SELECT * FROM {sourceTableName}";
 
                 using var command = new SqlCommand(sql, connection);
                 using var reader = await command.ExecuteReaderAsync();
@@ -30,9 +35,14 @@ namespace SQLServerInteraction
 
                     reader.GetValues(record);
 
-                    var json = JsonSerializer.Serialize(record);
+                    StringBuilder sb = new StringBuilder();
 
-                    await writer.WriteLineAsync(json);
+                    foreach (var field in record) 
+                    { 
+                        sb.Append("\"" + field?.ToString()?.Replace("\"", "\"\"") + "\",");
+                    }
+
+                    await writer.WriteLineAsync(sb.ToString().TrimEnd(','));
                 }
             }
             catch (Exception ex)
