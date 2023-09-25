@@ -4,6 +4,11 @@ namespace SQLServerInteraction
 {
     public partial class SQLServerInstance
     {
+        /// <summary>
+        /// Checks whether a table with the specified name exists in the database.
+        /// </summary>
+        /// <param name="tableName">The name of the table to check.</param>
+        /// <returns>True if the table exists; otherwise, false.</returns>
         public bool DoesTableExist(string tableName)
         {
             using var connection = new SqlConnection(_connectionString);

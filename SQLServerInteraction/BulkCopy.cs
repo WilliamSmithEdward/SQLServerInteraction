@@ -5,17 +5,23 @@ namespace SQLServerInteraction
 {
     public partial class SQLServerInstance
     {
-        public void BulkCopy(DataTable dt, string sqlServerTableName, bool flushTableBeforeCopy)
+        /// <summary>
+        /// Performs a bulk copy operation to insert data from a DataTable into a SQL Server table.
+        /// </summary>
+        /// <param name="dataTable">The DataTable containing the data to be copied.</param>
+        /// <param name="destinationTableName">The name of the destination SQL Server table.</param>
+        /// <param name="flushTable">A flag indicating whether to delete all rows in the destination table before copying data. Defaults to false.</param>
+        public void BulkCopy(DataTable dataTable, string destinationTableName, bool flushTable = false)
         {
             using var connection = new SqlConnection(_connectionString);
             using var bulkCopy = new SqlBulkCopy(connection);
 
             connection.Open();
 
-            if (flushTableBeforeCopy) using (var command = new SqlCommand("DELETE FROM " + sqlServerTableName, connection)) command.ExecuteNonQuery();
+            if (flushTable) using (var command = new SqlCommand("DELETE FROM " + destinationTableName, connection)) command.ExecuteNonQuery();
 
-            bulkCopy.DestinationTableName = sqlServerTableName;
-            bulkCopy.WriteToServer(dt);
+            bulkCopy.DestinationTableName = destinationTableName;
+            bulkCopy.WriteToServer(dataTable);
         }
     }
 }

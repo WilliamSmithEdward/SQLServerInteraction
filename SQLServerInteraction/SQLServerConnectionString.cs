@@ -1,14 +1,38 @@
-﻿using System;
-
-namespace SQLServerInteraction
+﻿namespace SQLServerInteraction
 {
+    /// <summary>
+    /// Represents a configuration for constructing a SQL Server connection string.
+    /// </summary>
     public class SQLServerConnectionString
     {
+        /// <summary>
+        /// Gets or sets the SQL Server host or instance name.
+        /// </summary>
         public string Server { get; set; }
+
+        /// <summary>
+        /// Gets or sets the name of the database to connect to.
+        /// </summary>
         public string DatabaseName { get; set; }
+
+        /// <summary>
+        /// Gets or sets the optional user ID for authentication.
+        /// </summary>
         public string? UserId { get; set; }
+
+        /// <summary>
+        /// Gets or sets the optional password for authentication.
+        /// </summary>
         public string? Password { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to use encryption in the connection.
+        /// </summary>
         public bool Encrypt { get; set; } = true;
+
+        /// <summary>
+        /// Gets or sets additional parameters to include in the connection string.
+        /// </summary>
         public string AdditionalParameters { get; set; }
 
         /// <summary>
@@ -35,6 +59,10 @@ namespace SQLServerInteraction
             AdditionalParameters = additionalParameters;
         }
 
+        /// <summary>
+        /// Constructs and returns a connection string for connecting to a SQL Server database.
+        /// </summary>
+        /// <returns>The constructed connection string.</returns>
         public string GetConnectionString()
         {
             string encryptPart = Encrypt ? "Encrypt=True;" : "Encrypt=False;";
