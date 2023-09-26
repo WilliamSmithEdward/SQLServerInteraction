@@ -27,10 +27,10 @@
 	<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 	<Title>SQLServerInteraction</Title>
 	<Copyright>William Smith (WilliamSmithE)</Copyright>
-	<Description>SQLServerInteraction is a .Net library that wraps the functionality included in Microsoft's "Microsoft.Data.SqlClient" library.</Description>
+	<Description>SQLServerInteraction is a C# library that wraps the functionality included in Microsoft's "Microsoft.Data.SqlClient" library.</Description>
 	<PackageProjectUrl>https://github.com/WilliamSmithEdward/SQLServerInteraction</PackageProjectUrl>
 	<RepositoryUrl></RepositoryUrl>
-	<PackageTags>sql;sqlserver;wrapper;helper;microsoft;sqlclient;async</PackageTags>
+	<PackageTags>C#;sql;sqlserver;wrapper;helper;microsoft;sqlclient;async</PackageTags>
   </PropertyGroup>
 	
   <PropertyGroup>
