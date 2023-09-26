@@ -35,7 +35,7 @@ namespace SQLServerInteraction
 
                     reader.GetValues(record);
 
-                    StringBuilder sb = new StringBuilder();
+                    var sb = new StringBuilder();
 
                     foreach (var field in record) 
                     { 
@@ -52,7 +52,7 @@ namespace SQLServerInteraction
             }
         }
 
-        private string[] GetColumnNames(IDataReader reader)
+        private static string[] GetColumnNames(IDataReader reader)
         {
             var columnNames = new string[reader.FieldCount];
             for (int i = 0; i < reader.FieldCount; i++)

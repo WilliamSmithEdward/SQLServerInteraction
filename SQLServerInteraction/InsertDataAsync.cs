@@ -4,6 +4,12 @@ namespace SQLServerInteraction
 {
     public partial class SQLServerInstance
     {
+        /// <summary>
+        /// Inserts data into a SQL Server table asynchronously using a dictionary of column names and corresponding values.
+        /// </summary>
+        /// <param name="sqlServerTableName">The name of the SQL Server table to insert data into.</param>
+        /// <param name="values">A dictionary containing column names and corresponding values for insertion.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
         public async Task InsertDataAsync(string sqlServerTableName, Dictionary<string, object> values)
         {
             using var connection = new SqlConnection(_connectionString);

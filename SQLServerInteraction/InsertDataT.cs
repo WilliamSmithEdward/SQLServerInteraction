@@ -4,6 +4,12 @@ namespace SQLServerInteraction
 {
     public partial class SQLServerInstance
     {
+        /// <summary>
+        /// Inserts data into a SQL Server table synchronously.
+        /// </summary>
+        /// <typeparam name="T">The type of data to insert.</typeparam>
+        /// <param name="data">The data to be inserted.</param>
+        /// <param name="sqlServerTableName">The name of the SQL Server table to insert data into.</param>
         public void InsertData<T>(T data, string sqlServerTableName) where T : class
         {
             var properties = typeof(T).GetProperties();

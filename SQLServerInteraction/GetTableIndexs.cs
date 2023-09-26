@@ -4,6 +4,11 @@ namespace SQLServerInteraction
 {
     public partial class SQLServerInstance
     {
+        /// <summary>
+        /// Retrieves the names of non-clustered indexes for a table in the SQL Server database.
+        /// </summary>
+        /// <param name="tableName">The name of the table for which to retrieve non-clustered indexes.</param>
+        /// <returns>A list of non-clustered index names for the specified table.</returns>
         public List<string> GetTableIndexs(string tableName)
         {
             var indexes = new List<string>();
@@ -24,6 +29,5 @@ namespace SQLServerInteraction
 
             return indexes;
         }
-
     }
 }

@@ -4,6 +4,11 @@ namespace SQLServerInteraction
 {
     public partial class SQLServerInstance
     {
+        /// <summary>
+        /// Retrieves the primary key column of a table in the SQL Server database.
+        /// </summary>
+        /// <param name="tableName">The name of the table for which to retrieve the primary key column.</param>
+        /// <returns>The name of the primary key column for the specified table, or null if not found.</returns>
         public string? GetTablePrimaryKeyColumn(string tableName)
         {
             using var connection = new SqlConnection(_connectionString);
@@ -17,7 +22,7 @@ namespace SQLServerInteraction
             using var command = new SqlCommand(sql, connection);
 
             var result = command.ExecuteScalar();
-            return result != null ? result.ToString() : null;
+            return result?.ToString();
         }
     }
 }

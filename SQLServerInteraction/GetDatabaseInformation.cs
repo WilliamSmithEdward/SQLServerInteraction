@@ -4,6 +4,10 @@ namespace SQLServerInteraction
 {
     public partial class SQLServerInstance
     {
+        /// <summary>
+        /// Retrieves information about the current SQL Server database.
+        /// </summary>
+        /// <returns>A dictionary containing database information: DatabaseName, DatabaseId, CreationDate, and Collation.</returns>
         public Dictionary<string, string> GetDatabaseInformation()
         {
             using var connection = new SqlConnection(_connectionString);

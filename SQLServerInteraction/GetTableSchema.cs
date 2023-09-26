@@ -5,6 +5,11 @@ namespace SQLServerInteraction
 {
     public partial class SQLServerInstance
     {
+        /// <summary>
+        /// Retrieves the schema of a table in the SQL Server database.
+        /// </summary>
+        /// <param name="tableName">The name of the table for which the schema is retrieved.</param>
+        /// <returns>A <see cref="System.Data.DataTable"/> containing the schema of the specified table.</returns>
         public DataTable GetTableSchema(string tableName)
         {
             using var connection = new SqlConnection(_connectionString);

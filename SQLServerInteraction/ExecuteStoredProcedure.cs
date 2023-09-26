@@ -5,6 +5,11 @@ namespace SQLServerInteraction
 {
     public partial class SQLServerInstance
     {
+        /// <summary>
+        /// Executes a stored procedure synchronously in the SQL Server database.
+        /// </summary>
+        /// <param name="storedProcedureName">The name of the stored procedure to execute.</param>
+        /// <param name="parameters">An optional array of SQL parameters to pass to the stored procedure.</param>
         public void ExecuteStoredProcedure(string storedProcedureName, SqlParameter[]? parameters = null)
         {
             using var connection = new SqlConnection(_connectionString);
