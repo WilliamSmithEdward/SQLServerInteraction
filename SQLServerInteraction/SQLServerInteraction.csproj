@@ -2,8 +2,8 @@
 
   <PropertyGroup>
 	<Deterministic>false</Deterministic>
-	<AssemblyVersion>1.0.14</AssemblyVersion>
-	<PackageVersion>1.0.14</PackageVersion>
+	<AssemblyVersion>1.0.15</AssemblyVersion>
+	<PackageVersion>1.0.15</PackageVersion>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -31,11 +31,8 @@
 	<PackageProjectUrl>https://github.com/WilliamSmithEdward/SQLServerInteraction</PackageProjectUrl>
 	<RepositoryUrl></RepositoryUrl>
 	<PackageTags>C#;sql;sqlserver;wrapper;helper;microsoft;sqlclient;async</PackageTags>
-  </PropertyGroup>
-	
-  <PropertyGroup>
-	<PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
 	<GenerateDocumentationFile>True</GenerateDocumentationFile>
   </PropertyGroup>
-
+	
 </Project>
