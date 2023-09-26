@@ -5,6 +5,10 @@ namespace SQLServerInteraction
 {
     public partial class SQLServerInstance
     {
+        /// <summary>
+        /// Retrieves the names of stored procedures in the SQL Server database.
+        /// </summary>
+        /// <returns>A list of stored procedure names in the database.</returns>
         public List<string> GetStoredProcedures()
         {
             using var connection = new SqlConnection(_connectionString);

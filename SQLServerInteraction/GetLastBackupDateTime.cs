@@ -4,6 +4,10 @@ namespace SQLServerInteraction
 {
     public partial class SQLServerInstance
     {
+        /// <summary>
+        /// Retrieves the date and time of the last database backup for the current SQL Server database.
+        /// </summary>
+        /// <returns>The date and time of the last database backup, or null if no backup is found.</returns>
         public DateTime? GetLastBackupDateTime()
         {
             using var connection = new SqlConnection(_connectionString);

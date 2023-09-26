@@ -5,7 +5,7 @@
     /// </summary>
     public partial class SQLServerInstance
     {
-        private string _connectionString;
+        private readonly string _connectionString;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SQLServerInstance"/> class with a connection string.
@@ -25,5 +25,4 @@
             _connectionString = connectionString.GetConnectionString();
         }
     }
-
 }

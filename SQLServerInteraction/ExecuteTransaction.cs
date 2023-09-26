@@ -4,6 +4,10 @@ namespace SQLServerInteraction
 {
     public partial class SQLServerInstance
     {
+        /// <summary>
+        /// Executes a list of SQL commands as a transaction synchronously.
+        /// </summary>
+        /// <param name="sqlCommands">A list of SQL commands to be executed within the transaction.</param>
         public void ExecuteTransaction(List<string> sqlCommands)
         {
             using var connection = new SqlConnection(_connectionString);

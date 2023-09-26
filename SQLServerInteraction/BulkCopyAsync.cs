@@ -21,10 +21,9 @@ namespace SQLServerInteraction
 
             if (flushTable)
             {
-                using (var command = new SqlCommand("DELETE FROM " + destinationTableName, connection))
-                {
-                    await command.ExecuteNonQueryAsync();
-                }
+                using var command = new SqlCommand("DELETE FROM " + destinationTableName, connection);
+                
+                await command.ExecuteNonQueryAsync();
             }
 
             bulkCopy.DestinationTableName = destinationTableName;

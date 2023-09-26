@@ -27,9 +27,7 @@ namespace SQLServerInteraction
 
                 foreach (var property in properties)
                 {
-                    var attribute = Attribute.GetCustomAttribute(property, typeof(ColumnAttribute)) as ColumnAttribute;
-
-                    string columnName = attribute != null ? attribute.Name : property.Name;
+                    string columnName = Attribute.GetCustomAttribute(property, typeof(ColumnAttribute)) is ColumnAttribute attribute ? attribute.Name : property.Name;
 
                     if (reader[columnName] != DBNull.Value)
                     {

@@ -4,6 +4,10 @@ namespace SQLServerInteraction
 {
     public partial class SQLServerInstance
     {
+        /// <summary>
+        /// Retrieves the size of the current SQL Server database in bytes.
+        /// </summary>
+        /// <returns>The size of the database in bytes.</returns>
         public long GetDatabaseSizeInBytes()
         {
             using var connection = new SqlConnection(_connectionString);
