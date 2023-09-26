@@ -15,14 +15,14 @@ namespace SQLServerInteraction
             connection.Open();
 
             string columns = string.Join(", ", values.Keys);
-            string parameters = string.Join(", ", values.Keys.Select(key => "@" + key));
+            string parameters = string.Join(", ", values.Keys.Select(key => "@" + key.Replace(" ", "_").Replace("[", "").Replace("]", "")));
             string sql = $"INSERT INTO {sqlServerTableName} ({columns}) VALUES ({parameters})";
 
             using var command = new SqlCommand(sql, connection);
 
             foreach (var kvp in values)
             {
-                command.Parameters.AddWithValue("@" + kvp.Key, kvp.Value);
+                command.Parameters.AddWithValue("@" + kvp.Key.Replace(" ", "_").Replace("[", "").Replace("]", ""), kvp.Value);
             }
 
             command.ExecuteNonQuery();
