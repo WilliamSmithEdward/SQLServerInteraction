@@ -37,7 +37,7 @@
 	<Description>SQLServerInteraction is a C# library that wraps the functionality included in Microsoft's "Microsoft.Data.SqlClient" library.</Description>
 	<PackageProjectUrl>https://github.com/WilliamSmithEdward/SQLServerInteraction</PackageProjectUrl>
 	<RepositoryUrl></RepositoryUrl>
-	<PackageTags>C#;sql;sqlserver;wrapper;helper;microsoft;sqlclient;async</PackageTags>
+	<PackageTags>C#;sql;server;sqlserver;wrapper;helper;microsoft;sqlclient;async</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
 	<GenerateDocumentationFile>True</GenerateDocumentationFile>
 	<PackageIcon>SQLServerInteraction.png</PackageIcon>
