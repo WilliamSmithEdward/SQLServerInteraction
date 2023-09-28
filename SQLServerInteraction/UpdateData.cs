@@ -21,8 +21,6 @@ namespace SQLServerInteraction
 
             using var command = new SqlCommand(sql, connection);
 
-            Console.WriteLine(sql);
-
             foreach (var kvp in valuesToUpdate)
             {
                 command.Parameters.AddWithValue("@" + kvp.Key.Replace(" ", "_").Replace("[","").Replace("]",""), kvp.Value);

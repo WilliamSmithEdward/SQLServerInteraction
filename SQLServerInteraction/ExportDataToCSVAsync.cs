@@ -15,40 +15,32 @@ namespace SQLServerInteraction
         /// <returns>A task representing the asynchronous operation.</returns>
         public async Task ExportDataToCSVAsync(string destinationFilePath, string sql)
         {
-            try
+            using var connection = new SqlConnection(_connectionString);
+            await connection.OpenAsync();
+
+            using var command = new SqlCommand(sql, connection);
+            using var reader = await command.ExecuteReaderAsync();
+
+            var columnNames = GetColumnNames(reader);
+
+            using var writer = new StreamWriter(destinationFilePath);
+
+            await writer.WriteLineAsync(string.Join(",", columnNames));
+
+            while (await reader.ReadAsync())
             {
-                using var connection = new SqlConnection(_connectionString);
-                await connection.OpenAsync();
+                var record = new object[reader.FieldCount];
 
-                using var command = new SqlCommand(sql, connection);
-                using var reader = await command.ExecuteReaderAsync();
+                reader.GetValues(record);
 
-                var columnNames = GetColumnNames(reader);
+                var sb = new StringBuilder();
 
-                using var writer = new StreamWriter(destinationFilePath);
-
-                await writer.WriteLineAsync(string.Join(",", columnNames));
-
-                while (await reader.ReadAsync())
-                {
-                    var record = new object[reader.FieldCount];
-
-                    reader.GetValues(record);
-
-                    var sb = new StringBuilder();
-
-                    foreach (var field in record) 
-                    { 
-                        sb.Append("\"" + field?.ToString()?.Replace("\"", "\"\"") + "\",");
-                    }
-
-                    await writer.WriteLineAsync(sb.ToString().TrimEnd(','));
+                foreach (var field in record) 
+                { 
+                    sb.Append("\"" + field?.ToString()?.Replace("\"", "\"\"") + "\",");
                 }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Error exporting data to CSV: " + ex.Message);
-                throw;
+
+                await writer.WriteLineAsync(sb.ToString().TrimEnd(','));
             }
         }
 
