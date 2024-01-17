@@ -2,8 +2,8 @@
 
   <PropertyGroup>
 	<Deterministic>false</Deterministic>
-	<AssemblyVersion>1.0.16.2</AssemblyVersion>
-	<PackageVersion>1.0.16.2</PackageVersion>
+	<AssemblyVersion>1.0.17</AssemblyVersion>
+	<PackageVersion>1.0.17</PackageVersion>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -17,7 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Data.SqlClient" Version="5.1.1" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="5.1.4" />
   </ItemGroup>
 
   <ItemGroup>
