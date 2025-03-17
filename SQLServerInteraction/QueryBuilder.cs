@@ -27,8 +27,8 @@ namespace SQLServerInteraction
         public QueryBuilder()
         {
             _query = new StringBuilder();
-            _parameters = new List<SQLParameter>();
-            _subqueries = new List<QueryBuilder>();
+            _parameters = [];
+            _subqueries = [];
             _nestedConditions = new Stack<string>();
             _isUnion = false;
             _isIntersect = false;
@@ -305,7 +305,7 @@ namespace SQLServerInteraction
         /// <exception cref="InvalidOperationException">Thrown when the SQL statement is not valid (missing SELECT or FROM clause).</exception>
         public QueryBuildResult Build()
         {
-            if (!_query.ToString().ToUpper().Contains("SELECT") || !_query.ToString().ToUpper().Contains("FROM"))
+            if (!_query.ToString().Contains("SELECT", StringComparison.CurrentCultureIgnoreCase) || !_query.ToString().Contains("FROM", StringComparison.CurrentCultureIgnoreCase))
                 throw new InvalidOperationException("A valid SELECT statement with FROM clause is required.");
 
             var formattedParameters = new StringBuilder();
