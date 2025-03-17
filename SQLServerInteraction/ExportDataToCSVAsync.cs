@@ -35,16 +35,17 @@ namespace SQLServerInteraction
 
                 var sb = new StringBuilder();
 
-                foreach (var field in record) 
-                { 
+                foreach (var field in record)
+                {
                     sb.Append("\"" + field?.ToString()?.Replace("\"", "\"\"") + "\",");
+
                 }
 
                 await writer.WriteLineAsync(sb.ToString().TrimEnd(','));
             }
         }
 
-        private static string[] GetColumnNames(IDataReader reader)
+        private static string[] GetColumnNames(SqlDataReader reader)
         {
             var columnNames = new string[reader.FieldCount];
             for (int i = 0; i < reader.FieldCount; i++)

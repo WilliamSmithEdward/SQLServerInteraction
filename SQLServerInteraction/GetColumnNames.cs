@@ -16,7 +16,7 @@ namespace SQLServerInteraction
             connection.Open();
 
             var columns = new List<string>();
-            var dt = connection.GetSchema("Columns", new[] { null, null, tableName });
+            var dt = connection.GetSchema("Columns", [null, null, tableName]);
 
             foreach (DataRow row in dt.Rows)
             {
