@@ -13,20 +13,39 @@ namespace SQLServerInteraction
         /// <param name="flushTable">A flag indicating whether to delete all rows in the destination table before copying data. Defaults to false.</param>
         /// <param name="bulkCopyTimeout">Connection time-out value in seconds. Defaults to 30.</param>
         /// <param name="batchSize">Instructs the bulk copy operation to split the data into chunks when transferring. Defaults to no batching.</param>
-        public void BulkCopy(DataTable dataTable, string destinationTableName, bool flushTable = false, int bulkCopyTimeout = 30, int? batchSize = null)
+        /// <param name="useTransaction">A flag indicating whether to wrap the operation in a transaction to prevent readers from seeing partial data. Defaults to true.</param>
+        public void BulkCopy(DataTable dataTable, string destinationTableName, bool flushTable = false, int bulkCopyTimeout = 30, int? batchSize = null, bool useTransaction = true)
         {
             using var connection = new SqlConnection(_connectionString);
-            using var bulkCopy = new SqlBulkCopy(connection);
-
-            bulkCopy.BulkCopyTimeout = bulkCopyTimeout;
-            if (batchSize.HasValue) bulkCopy.BatchSize = batchSize.Value;
-
             connection.Open();
 
-            if (flushTable) using (var command = new SqlCommand("DELETE FROM " + destinationTableName, connection)) command.ExecuteNonQuery();
+            SqlTransaction? transaction = useTransaction ? connection.BeginTransaction() : null;
 
-            bulkCopy.DestinationTableName = destinationTableName;
-            bulkCopy.WriteToServer(dataTable);
+            try
+            {
+                using var bulkCopy = new SqlBulkCopy(connection, SqlBulkCopyOptions.Default, transaction);
+
+                bulkCopy.BulkCopyTimeout = bulkCopyTimeout;
+                if (batchSize.HasValue) bulkCopy.BatchSize = batchSize.Value;
+
+                if (flushTable) using (var command = new SqlCommand("DELETE FROM " + destinationTableName, connection, transaction)) command.ExecuteNonQuery();
+
+                bulkCopy.DestinationTableName = destinationTableName;
+                bulkCopy.WriteToServer(dataTable);
+
+                transaction?.Commit();
+            }
+
+            catch
+            {
+                transaction?.Rollback();
+                throw;
+            }
+
+            finally
+            {
+                transaction?.Dispose();
+            }
         }
     }
 }
