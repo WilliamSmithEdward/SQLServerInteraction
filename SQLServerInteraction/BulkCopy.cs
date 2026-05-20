@@ -14,7 +14,8 @@ namespace SQLServerInteraction
         /// <param name="bulkCopyTimeout">Connection time-out value in seconds. Defaults to 30.</param>
         /// <param name="batchSize">Instructs the bulk copy operation to split the data into chunks when transferring. Defaults to no batching.</param>
         /// <param name="useTransaction">A flag indicating whether to wrap the operation in a transaction to prevent readers from seeing partial data. Defaults to true.</param>
-        public void BulkCopy(DataTable dataTable, string destinationTableName, bool flushTable = false, int bulkCopyTimeout = 30, int? batchSize = null, bool useTransaction = true)
+        /// <param name="flushWhereClauseCondition">An optional WHERE clause condition (without the WHERE keyword) to limit which rows are deleted when flushTable is true. If omitted, all rows are deleted.</param>
+        public void BulkCopy(DataTable dataTable, string destinationTableName, bool flushTable = false, int bulkCopyTimeout = 30, int? batchSize = null, bool useTransaction = true, string? flushWhereClauseCondition = null)
         {
             using var connection = new SqlConnection(_connectionString);
             connection.Open();
@@ -28,7 +29,12 @@ namespace SQLServerInteraction
                 bulkCopy.BulkCopyTimeout = bulkCopyTimeout;
                 if (batchSize.HasValue) bulkCopy.BatchSize = batchSize.Value;
 
-                if (flushTable) using (var command = new SqlCommand("DELETE FROM " + destinationTableName, connection, transaction)) command.ExecuteNonQuery();
+                if (flushTable)
+                {
+                    var deleteSQL = "DELETE FROM " + destinationTableName + (string.IsNullOrWhiteSpace(flushWhereClauseCondition) ? "" : " WHERE " + flushWhereClauseCondition);
+                    using var command = new SqlCommand(deleteSQL, connection, transaction);
+                    command.ExecuteNonQuery();
+                }
 
                 bulkCopy.DestinationTableName = destinationTableName;
                 bulkCopy.WriteToServer(dataTable);
