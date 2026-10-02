@@ -2,8 +2,8 @@
 
   <PropertyGroup>
 	<Deterministic>false</Deterministic>
-	<AssemblyVersion>1.1.1</AssemblyVersion>
-	<PackageVersion>1.1.1</PackageVersion>
+	<AssemblyVersion>2.0.0</AssemblyVersion>
+	<PackageVersion>2.0.0</PackageVersion>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -41,7 +41,7 @@
 	<Title>SQLServerInteraction</Title>
 	<Authors>WilliamSmithE</Authors>
 	<Copyright>William Smith (WilliamSmithE)</Copyright>
-	<Description>Helper methods over Microsoft.Data.SqlClient for SQL Server: queries into DataTables, scalars and mapped objects, parameterized commands, transactions, bulk copy, insert, update and delete from dictionaries, CSV export, backup and restore, and schema lookups. The data methods have async versions. Table names, column names and conditions are inserted into the SQL as written.</Description>
+	<Description>Helper methods over Microsoft.Data.SqlClient for SQL Server: queries into DataTables, scalars and mapped objects, parameterized commands, transactions, bulk copy, insert, update and delete from dictionaries, CSV export, backup and restore, and schema lookups. The data methods have async versions. Values are sent as parameters and table, column and index names are quoted as identifiers.</Description>
 	<PackageProjectUrl>https://github.com/WilliamSmithEdward/SQLServerInteraction</PackageProjectUrl>
 	<RepositoryUrl>https://github.com/WilliamSmithEdward/SQLServerInteraction</RepositoryUrl>
 	<RepositoryType>git</RepositoryType>
