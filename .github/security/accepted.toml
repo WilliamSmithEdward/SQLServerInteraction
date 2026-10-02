@@ -9,3 +9,152 @@
 # Add an entry only with a reason a reviewer can check. Fixing the code
 # is the better answer wherever there is one.
 
+[[finding]]
+tool = "Semgrep"
+rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
+reason = "ExecuteQuery runs the SQL the caller passes; running the caller's SQL is the method's purpose, and the README lists it under the methods that run your SQL."
+where = [{ path = "SQLServerInteraction/ExecuteQuery.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+
+[[finding]]
+tool = "Semgrep"
+rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
+reason = "ExecuteQueryAsync runs the SQL the caller passes; running the caller's SQL is the method's purpose, and the README lists it under the methods that run your SQL."
+where = [{ path = "SQLServerInteraction/ExecuteQueryAsync.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+
+[[finding]]
+tool = "Semgrep"
+rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
+reason = "ExecuteQuery<T> runs the SQL the caller passes; running the caller's SQL is the method's purpose, and the README lists it under the methods that run your SQL."
+where = [{ path = "SQLServerInteraction/ExecuteQueryT.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+
+[[finding]]
+tool = "Semgrep"
+rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
+reason = "ExecuteQueryAsync<T> runs the SQL the caller passes; running the caller's SQL is the method's purpose, and the README lists it under the methods that run your SQL."
+where = [{ path = "SQLServerInteraction/ExecuteQueryTAsync.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+
+[[finding]]
+tool = "Semgrep"
+rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
+reason = "ExecuteScalar<T> runs the SQL the caller passes; running the caller's SQL is the method's purpose, and the README lists it under the methods that run your SQL."
+where = [{ path = "SQLServerInteraction/ExecuteScalarT.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+
+[[finding]]
+tool = "Semgrep"
+rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
+reason = "ExecuteScalarAsync<T> runs the SQL the caller passes; running the caller's SQL is the method's purpose, and the README lists it under the methods that run your SQL."
+where = [{ path = "SQLServerInteraction/ExecuteScalarTAsync.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+
+[[finding]]
+tool = "Semgrep"
+rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
+reason = "ExecuteSQL runs the SQL the caller passes; running the caller's SQL is the method's purpose, and the README lists it under the methods that run your SQL. IndexCreate and IndexDrop also run through it, with every name quoted by SqlIdentifier."
+where = [{ path = "SQLServerInteraction/ExecuteSQL.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+
+[[finding]]
+tool = "Semgrep"
+rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
+reason = "ExecuteSQLAsync runs the SQL the caller passes; running the caller's SQL is the method's purpose, and the README lists it under the methods that run your SQL."
+where = [{ path = "SQLServerInteraction/ExecuteSQLAsync.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+
+[[finding]]
+tool = "Semgrep"
+rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
+reason = "ExecuteNonQueryWithParameters runs the SQL the caller passes; running the caller's SQL is the method's purpose, and the README lists it under the methods that run your SQL. Values go as parameters: the dictionary becomes SqlParameters."
+where = [{ path = "SQLServerInteraction/ExecuteNonQueryWithParameters.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+
+[[finding]]
+tool = "Semgrep"
+rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
+reason = "ExecuteNonQueryWithParametersAsync runs the SQL the caller passes; running the caller's SQL is the method's purpose, and the README lists it under the methods that run your SQL. Values go as parameters: the dictionary becomes SqlParameters."
+where = [{ path = "SQLServerInteraction/ExecuteNonQueryWithParametersAsync.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+
+[[finding]]
+tool = "Semgrep"
+rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
+reason = "ExecuteParameterizedQuery runs the SQL the caller passes; running the caller's SQL is the method's purpose, and the README lists it under the methods that run your SQL. Values go as parameters: the caller's SqlParameter array."
+where = [{ path = "SQLServerInteraction/ExecuteParameterizedQuery.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+
+[[finding]]
+tool = "Semgrep"
+rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
+reason = "ExecuteParameterizedQueryAsync runs the SQL the caller passes; running the caller's SQL is the method's purpose, and the README lists it under the methods that run your SQL. Values go as parameters: the caller's SqlParameter array."
+where = [{ path = "SQLServerInteraction/ExecuteParameterizedQueryAsync.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+
+[[finding]]
+tool = "Semgrep"
+rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
+reason = "ExecuteQueryToObjectList<T> runs the SQL the caller passes; running the caller's SQL is the method's purpose, and the README lists it under the methods that run your SQL. Values go as parameters: the dictionary becomes SqlParameters."
+where = [{ path = "SQLServerInteraction/ExecuteQueryToObjectListT.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+
+[[finding]]
+tool = "Semgrep"
+rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
+reason = "ExecuteQueryToObjectListAsync<T> runs the SQL the caller passes; running the caller's SQL is the method's purpose, and the README lists it under the methods that run your SQL. Values go as parameters: the dictionary becomes SqlParameters."
+where = [{ path = "SQLServerInteraction/ExecuteQueryToObjectListTAsync.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+
+[[finding]]
+tool = "Semgrep"
+rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
+reason = "ExportDataToCSVAsync runs the SQL the caller passes; running the caller's SQL is the method's purpose, and the README lists it under the methods that run your SQL."
+where = [{ path = "SQLServerInteraction/ExportDataToCSVAsync.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+
+[[finding]]
+tool = "Semgrep"
+rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
+reason = "ExecuteScriptFromFileAsync runs the SQL script in the file the caller names; running the caller's script is the method's purpose, and the README lists it under the methods that run your SQL."
+where = [{ path = "SQLServerInteraction/ExecuteScriptFromFileAsync.cs", line = "using var command = new SqlCommand(script, connection);" }]
+
+[[finding]]
+tool = "Semgrep"
+rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
+reason = "ExecuteStoredProcedure sends the stored procedure name with CommandType.StoredProcedure, so SqlClient calls it as a procedure name; it is not parsed as a batch. Its values go in the caller's SqlParameter array."
+where = [{ path = "SQLServerInteraction/ExecuteStoredProcedure.cs", line = "using var command = new SqlCommand(storedProcedureName, connection);" }]
+
+[[finding]]
+tool = "Semgrep"
+rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
+reason = "ExecuteStoredProcedureAsync sends the stored procedure name with CommandType.StoredProcedure, so SqlClient calls it as a procedure name; it is not parsed as a batch. Its values go in the caller's SqlParameter array."
+where = [{ path = "SQLServerInteraction/ExecuteStoredProcedureAsync.cs", line = "using var command = new SqlCommand(storedProcedureName, connection);" }]
+
+[[finding]]
+tool = "Semgrep"
+rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
+reason = "GetStoredProcedureParameters sends the stored procedure name with CommandType.StoredProcedure, so SqlClient calls it as a procedure name; it is not parsed as a batch. SqlCommandBuilder.DeriveParameters reads its parameters; nothing runs it."
+where = [{ path = "SQLServerInteraction/GetStoredProcedureParameters.cs", line = "using var command = new SqlCommand(storedProcedureName, connection);" }]
+
+[[finding]]
+tool = "Semgrep"
+rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
+reason = "DeleteData takes its condition as a SQL fragment by design, documented as such. The table name is quoted by SqlIdentifier, an empty condition throws, and values in the condition go as parameters through the overload that takes them."
+where = [{ path = "SQLServerInteraction/DeleteData.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+
+[[finding]]
+tool = "Semgrep"
+rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
+reason = "DeleteDataAsync takes its condition as a SQL fragment by design, documented as such. The table name is quoted by SqlIdentifier, an empty condition throws, and values in the condition go as parameters through the overload that takes them."
+where = [{ path = "SQLServerInteraction/DeleteDataAsync.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+
+[[finding]]
+tool = "Semgrep"
+rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
+reason = "UpdateData takes its condition as a SQL fragment by design, documented as such. The table name and every column name are quoted by SqlIdentifier, an empty condition throws, and values in the condition go as parameters through the overload that takes them. The values to set are parameters."
+where = [{ path = "SQLServerInteraction/UpdateData.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+
+[[finding]]
+tool = "Semgrep"
+rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
+reason = "UpdateDataAsync takes its condition as a SQL fragment by design, documented as such. The table name and every column name are quoted by SqlIdentifier, an empty condition throws, and values in the condition go as parameters through the overload that takes them. The values to set are parameters."
+where = [{ path = "SQLServerInteraction/UpdateDataAsync.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+
+[[finding]]
+tool = "Semgrep"
+rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
+reason = "BulkCopy takes its flush condition as a SQL fragment by design, documented as such. The table name is quoted by SqlIdentifier, an empty condition throws, and values in the condition go as parameters through the overload that takes them."
+where = [{ path = "SQLServerInteraction/BulkCopy.cs", line = "using var command = new SqlCommand(deleteSQL, connection, transaction);" }]
+
+[[finding]]
+tool = "Semgrep"
+rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
+reason = "BulkCopyAsync takes its flush condition as a SQL fragment by design, documented as such. The table name is quoted by SqlIdentifier, an empty condition throws, and values in the condition go as parameters through the overload that takes them."
+where = [{ path = "SQLServerInteraction/BulkCopyAsync.cs", line = "using var command = new SqlCommand(deleteSQL, connection, transaction);" }]
