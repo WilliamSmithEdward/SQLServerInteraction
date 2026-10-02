@@ -7,25 +7,19 @@ namespace SQLServerInteraction
         /// <summary>
         /// Inserts data into a SQL Server table asynchronously using a dictionary of column names and corresponding values.
         /// </summary>
-        /// <param name="sqlServerTableName">The name of the SQL Server table to insert data into, inserted into the SQL as written, without quoting or escaping.</param>
-        /// <param name="values">A dictionary containing column names and corresponding values for insertion. The values are sent as parameters; the keys are inserted into the SQL as written, without quoting or escaping, so bracket a name that needs it ("[My Field]"). Pass DBNull.Value, not null, for NULL.</param>
+        /// <param name="sqlServerTableName">The name of the table, such as <c>Sales</c>, <c>dbo.Sales</c> or <c>[dbo].[My Sales]</c>. It is quoted as an identifier.</param>
+        /// <param name="values">Column names and the values to insert. Each key is one column name, plain or bracketed (<c>My Field</c> or <c>[My Field]</c>), and is quoted as an identifier; the values are sent as parameters. Pass DBNull.Value, not null, for NULL.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
+        /// <exception cref="ArgumentException">A table or column name is not a valid name, or there are no values.</exception>
         public async Task InsertDataAsync(string sqlServerTableName, Dictionary<string, object> values)
         {
+            string sql = InsertSql(sqlServerTableName, values.Keys);
+
             using var connection = new SqlConnection(_connectionString);
             await connection.OpenAsync();
 
-            // Create SQL query to insert data
-            string columns = string.Join(", ", values.Keys);
-            string parameters = string.Join(", ", values.Keys.Select(key => "@" + key.Replace(" ", "_").Replace("[", "").Replace("]", "")));
-            string sql = $"INSERT INTO {sqlServerTableName} ({columns}) VALUES ({parameters})";
-
             using var command = new SqlCommand(sql, connection);
-
-            foreach (var kvp in values)
-            {
-                command.Parameters.AddWithValue("@" + kvp.Key.Replace(" ", "_").Replace("[", "").Replace("]", ""), kvp.Value);
-            }
+            AddValueParameters(command, values.Values);
 
             await command.ExecuteNonQueryAsync();
         }

@@ -5,27 +5,24 @@ namespace SQLServerInteraction
     public partial class SQLServerInstance
     {
         /// <summary>
-        /// Asynchronously updates records in a SQL Server table.
+        /// Asynchronously updates the records of a SQL Server table that match a condition.
         /// </summary>
-        /// <param name="sqlServerTableName">The name of the SQL Server table to update, inserted into the SQL as written, without quoting or escaping.</param>
-        /// <param name="valuesToUpdate">A dictionary containing column names and their corresponding values to update. The values are sent as parameters; the keys are inserted into the SQL as written, without quoting or escaping, so bracket a name that needs it ("[My Field]"). Pass DBNull.Value, not null, for NULL.</param>
-        /// <param name="condition">An optional condition to filter which records to update. SQL text without the WHERE keyword, inserted into the SQL as written, without quoting or escaping. Defaults to "1 = 1", updating every row, if not provided.</param>
+        /// <param name="sqlServerTableName">The name of the table, such as <c>Sales</c>, <c>dbo.Sales</c> or <c>[dbo].[My Sales]</c>. It is quoted as an identifier.</param>
+        /// <param name="valuesToUpdate">Column names and the values to set. Each key is one column name, plain or bracketed (<c>My Field</c> or <c>[My Field]</c>), and is quoted as an identifier; the values are sent as parameters named <c>@__value_0</c>, <c>@__value_1</c> and so on. Pass DBNull.Value, not null, for NULL.</param>
+        /// <param name="condition">The rows to update: SQL text without the WHERE keyword, inserted as written. Put values in <paramref name="parameters"/> rather than in the text. To update every row, pass <c>1 = 1</c>.</param>
+        /// <param name="parameters">Optional parameters for <paramref name="condition"/>. Names work with or without the @, and null is sent as NULL.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
-        public async Task UpdateDataAsync(string sqlServerTableName, Dictionary<string, object> valuesToUpdate, string condition = "")
+        /// <exception cref="ArgumentException">A table or column name is not a valid name, there are no values, or <paramref name="condition"/> is empty or whitespace.</exception>
+        public async Task UpdateDataAsync(string sqlServerTableName, Dictionary<string, object> valuesToUpdate, string condition, Dictionary<string, object>? parameters = null)
         {
-            string setClause = string.Join(", ", valuesToUpdate.Select(kvp => $"{kvp.Key} = @{kvp.Key.Replace(" ", "_").Replace("[", "").Replace("]", "")}"));
-            if (string.IsNullOrEmpty(condition)) condition = "1 = 1";
-            string sql = $"UPDATE {sqlServerTableName} SET {setClause} WHERE {condition}";
+            string sql = UpdateSql(sqlServerTableName, valuesToUpdate.Keys, condition);
 
             using var connection = new SqlConnection(_connectionString);
             await connection.OpenAsync();
 
             using var command = new SqlCommand(sql, connection);
-
-            foreach (var kvp in valuesToUpdate)
-            {
-                command.Parameters.AddWithValue("@" + kvp.Key.Replace(" ", "_").Replace("[", "").Replace("]", ""), kvp.Value);
-            }
+            AddValueParameters(command, valuesToUpdate.Values);
+            CommandParameters.Add(command, parameters);
 
             await command.ExecuteNonQueryAsync();
         }

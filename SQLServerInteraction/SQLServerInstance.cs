@@ -24,5 +24,16 @@
         {
             _connectionString = connectionString.GetConnectionString();
         }
+
+        /// <summary>
+        /// A WHERE condition as given, refused when it is empty or whitespace, so that
+        /// a missing condition never turns into every row.
+        /// </summary>
+        private static string RequireCondition(string condition, string parameterName)
+        {
+            if (string.IsNullOrWhiteSpace(condition))
+                throw new ArgumentException("A condition is required. To affect every row, pass \"1 = 1\".", parameterName);
+            return condition;
+        }
     }
 }

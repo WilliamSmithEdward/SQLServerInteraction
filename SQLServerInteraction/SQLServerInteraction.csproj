@@ -22,6 +22,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="SQLServerInteraction.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Update="SQLServerInteraction.png">
       <Pack>True</Pack>
       <PackagePath>\</PackagePath>
