@@ -76,7 +76,7 @@ int count = db.ExecuteScalar<int>("SELECT COUNT(*) FROM dbo.Orders");
 decimal total = await db.ExecuteScalarAsync<decimal>("SELECT SUM(Total) FROM dbo.Orders");
 ```
 
-- `ExecuteQuery<T>` and `ExecuteQueryAsync<T>` read only the first column and convert each value with `Convert.ChangeType`. A NULL becomes `""` for `string` and throws `InvalidCastException` for a value type.
+- `ExecuteQuery<T>` and `ExecuteQueryAsync<T>` read only the first column and convert each value with `Convert.ChangeType`. A nullable type such as `int?` converts to its underlying type, and NULL gives null. Otherwise a NULL becomes `""` for `string` and throws `InvalidCastException` for a value type.
 - `ExecuteScalar<T>` and `ExecuteScalarAsync<T>` return `default(T)` when the query returns no rows or a NULL, and otherwise convert the value with `Convert.ChangeType`. A nullable type converts to its underlying type, so `ExecuteScalar<int?>` returns the number, or null for no rows or NULL.
 - None of these four take parameters. To filter on a value, use `ExecuteQueryToObjectList<T>` below, which does.
 

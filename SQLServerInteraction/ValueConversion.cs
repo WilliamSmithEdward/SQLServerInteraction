@@ -17,5 +17,19 @@
             Type target = Nullable.GetUnderlyingType(typeof(T)) ?? typeof(T);
             return (T)Convert.ChangeType(value, target);
         }
+
+        /// <summary>
+        /// A value of <c>ExecuteQuery&lt;T&gt;</c>'s first column as <typeparamref name="T"/>. A nullable
+        /// type converts to its underlying type, and NULL gives null. Any other type converts with
+        /// Convert.ChangeType as in 1.1.1, so NULL becomes "" for string and throws for a value type.
+        /// </summary>
+        /// <exception cref="InvalidCastException">The value cannot be converted to <typeparamref name="T"/>.</exception>
+        internal static T ChangeQueryValue<T>(object value)
+        {
+            Type? underlying = Nullable.GetUnderlyingType(typeof(T));
+            if (underlying == null) return (T)Convert.ChangeType(value, typeof(T));
+
+            return value == DBNull.Value ? default! : (T)Convert.ChangeType(value, underlying);
+        }
     }
 }
