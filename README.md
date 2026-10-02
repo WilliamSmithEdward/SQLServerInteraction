@@ -209,7 +209,7 @@ await db.InsertDataAsync(new Customer { CustomerId = 8, Name = "Fabrikam" }, "db
 - Table names can have one, two or three parts (`Customers`, `dbo.Customers`, `MyDb.dbo.Customers`), each plain or in brackets (`[dbo].[My Customers]`). Every part is quoted, so a name with a space or any other character works and cannot change the SQL. A malformed name (an empty part, an unclosed bracket, more than three parts, a part over 128 characters) throws `ArgumentException`.
 - Each dictionary key is one column name, plain or bracketed (`Customer Name` or `[Customer Name]`), and is quoted the same way. Bracket a column name that contains a dot. The values are sent as parameters named `@__value_0`, `@__value_1` and so on, so do not give condition parameters those names.
 - A null value is not sent as NULL (see above); use `DBNull.Value`.
-- `UpdateData` and `DeleteData` take the condition as SQL text without the `WHERE` keyword, run as written, and an optional dictionary of parameters for it. Parameter names work with or without the `@`, and null is sent as NULL.
+- `UpdateData` and `DeleteData` take the condition as SQL text without the `WHERE` keyword, run as written. An overload of each (and of the async versions) takes a dictionary of parameters for the condition as its last argument. Parameter names work with or without the `@`, and null is sent as NULL.
 - The condition is required. An empty or whitespace condition throws `ArgumentException` instead of affecting every row; to update or delete every row, pass `"1 = 1"`.
 - `InsertData<T>` and `InsertDataAsync<T>` insert one row with a column for every public property of `T`, named exactly as the property. They ignore `SQLServerInstance.Column`, so the example above writes to a column called `Name`. A null property value is sent as NULL. Include only properties that have columns; an identity column fails unless `IDENTITY_INSERT` is on.
 - None of these return the number of rows affected.
@@ -246,7 +246,7 @@ await db.BulkCopyAsync(table, "dbo.Orders",
 |---|---|---|
 | `flushTable` | `false` | Delete rows from the destination before copying. |
 | `flushWhereClauseCondition` | `null` | With `flushTable`, delete only the rows matching this condition (SQL text without `WHERE`, run as written). Left null, every row is deleted. An empty or whitespace string throws `ArgumentException`. |
-| `flushParameters` | `null` | Parameters for `flushWhereClauseCondition`. Names work with or without the `@`, and null is sent as NULL. |
+| `flushParameters` | none | Parameters for `flushWhereClauseCondition`, taken by an overload whose first five arguments are `dataTable`, `destinationTableName`, `flushTable`, `flushWhereClauseCondition` and `flushParameters`. Names work with or without the `@`, and null is sent as NULL. |
 | `bulkCopyTimeout` | `30` | Seconds the copy may take before it fails. |
 | `batchSize` | `null` | Rows per batch sent to the server. `null` sends all rows in one batch. |
 | `useTransaction` | `true` | Run the delete and the copy in one transaction, rolled back if either fails, so readers never see the table half-written. With `false`, a failure can leave the table emptied or partly filled. |
@@ -318,7 +318,7 @@ These methods run SQL text you write. Treat every string listed here as code: bu
 |---|---|
 | `ExecuteQuery`, `ExecuteQuery<T>`, `ExecuteScalar<T>`, `ExecuteSQL`, `ExecuteTransaction`, `ExportDataToCSVAsync`, `ExecuteScriptFromFileAsync` (file contents) | the SQL itself |
 | `ExecuteNonQueryWithParameters`, `ExecuteParameterizedQuery`, `ExecuteQueryToObjectList<T>` | the SQL itself; values go as parameters |
-| `UpdateData`, `DeleteData` | the condition; its values can go in the parameters dictionary |
+| `UpdateData`, `DeleteData` | the condition; its values can go in the parameters dictionary their overloads take |
 | `BulkCopy` | `flushWhereClauseCondition`; its values can go in `flushParameters` |
 | `QueryBuilder` (every method) | every string |
 
