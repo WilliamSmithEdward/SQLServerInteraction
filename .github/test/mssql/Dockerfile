@@ -1,0 +1,4 @@
+# The SQL Server the integration tests run against, pinned by digest (the
+# image is published for linux/amd64 only); Dependabot proposes new releases.
+# scripts/test/run-integration-tests.sh builds and starts it.
+FROM mcr.microsoft.com/mssql/server:2022-CU27-ubuntu-22.04@sha256:4402d880dd4c34bfa7d8705e56a86cd6c88da80a1f6bbbe741f999e76264a090

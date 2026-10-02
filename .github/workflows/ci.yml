@@ -1,7 +1,7 @@
 name: CI
 
-# The library built and packed as nuget.org would receive it. There are no
-# tests: every method needs a SQL Server, and CI has none.
+# The library built and packed as nuget.org would receive it, and the tests
+# run against a real SQL Server in a container.
 
 on:
   push:
@@ -66,12 +66,46 @@ jobs:
           path: dist/
           if-no-files-found: error
 
+  # The unit tests, and the integration tests against SQL Server 2022 in a
+  # container that scripts/test/run-integration-tests.sh builds from
+  # .github/test/mssql/Dockerfile, with an SA password made for the run that
+  # never leaves the script's environment. --fail-skips turns a skipped test
+  # into a failure, so the integration tests cannot pass here by not running.
+  test:
+    name: Test (unit, and integration on SQL Server 2022)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The SDK comes from global.json. The library and the tests target
+      # net9.0, so the .NET 9 runtime comes from the 9.0 SDK named here, an
+      # exact release; move it by hand to the newest 9.0 SDK that is a week
+      # old (https://dotnet.microsoft.com/download/dotnet/9.0).
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: 9.0.318
+          global-json-file: global.json
+
+      - name: Restore from the lock file
+        run: dotnet restore SQLServerInteraction.sln --locked-mode
+
+      - name: Build Release
+        run: dotnet build SQLServerInteraction.sln --no-restore -c Release
+
+      - name: Run every test against a SQL Server container (fails on a skipped test)
+        run: bash scripts/test/run-integration-tests.sh -c Release --no-build --fail-skips on
+
   # The one check the main ruleset requires. It fails unless every job above
   # passed, a skipped one included.
   ci-passed:
     name: CI passed
     if: always()
-    needs: [build]
+    needs: [build, test]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
