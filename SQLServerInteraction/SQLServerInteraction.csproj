@@ -33,6 +33,7 @@
 	<ImplicitUsings>enable</ImplicitUsings>
 	<Nullable>enable</Nullable>
 	<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+	<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
 	<Title>SQLServerInteraction</Title>
 	<Authors>WilliamSmithE</Authors>
 	<Copyright>William Smith (WilliamSmithE)</Copyright>
