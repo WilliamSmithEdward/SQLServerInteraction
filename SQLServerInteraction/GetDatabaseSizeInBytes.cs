@@ -5,9 +5,9 @@ namespace SQLServerInteraction
     public partial class SQLServerInstance
     {
         /// <summary>
-        /// Retrieves the size of the current SQL Server database in bytes.
+        /// Retrieves the total size of the current database's data and log files.
         /// </summary>
-        /// <returns>The size of the database in bytes.</returns>
+        /// <returns>The size in kilobytes, despite the method's name: the sum of sys.master_files.size, which counts 8 KB pages, times 8.</returns>
         public long GetDatabaseSizeInBytes()
         {
             using var connection = new SqlConnection(_connectionString);

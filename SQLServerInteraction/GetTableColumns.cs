@@ -7,7 +7,7 @@ namespace SQLServerInteraction
         /// <summary>
         /// Retrieves the names and data types of columns for a table in the SQL Server database.
         /// </summary>
-        /// <param name="tableName">The name of the table for which to retrieve columns.</param>
+        /// <param name="tableName">The name of the table for which to retrieve columns, placed between quotes in the SQL as written, without escaping.</param>
         /// <returns>A dictionary where keys are column names and values are data types for the specified table.</returns>
         public Dictionary<string, string> GetTableColumns(string tableName)
         {

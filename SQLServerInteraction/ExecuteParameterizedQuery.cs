@@ -5,7 +5,7 @@ namespace SQLServerInteraction
     public partial class SQLServerInstance
     {
         /// <summary>
-        /// Executes a parameterized SQL query with SqlParameter objects.
+        /// Executes a parameterized SQL command with SqlParameter objects. No result set or row count is returned.
         /// </summary>
         /// <param name="sql">The SQL query to execute.</param>
         /// <param name="parameters">An array of SqlParameter objects to be added to the SQL command.</param>

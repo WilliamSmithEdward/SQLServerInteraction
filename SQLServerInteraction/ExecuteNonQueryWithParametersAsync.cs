@@ -8,7 +8,7 @@ namespace SQLServerInteraction
         /// Asynchronously executes a non-query SQL command with parameters.
         /// </summary>
         /// <param name="sql">The SQL command to execute.</param>
-        /// <param name="parameters">A dictionary of parameters to be added to the SQL command.</param>
+        /// <param name="parameters">A dictionary of parameters to be added to the SQL command. Keys are parameter names without the @, which is added. Pass DBNull.Value, not null, for NULL.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
         public async Task ExecuteNonQueryWithParametersAsync(string sql, Dictionary<string, object> parameters)
         {

@@ -81,15 +81,17 @@ namespace SQLServerInteraction
         /// Adds an OR condition to the WHERE clause in the SQL statement.
         /// </summary>
         /// <param name="condition">The additional condition to be combined with the existing WHERE clause using OR.</param>
-        /// <returns>The updated SQL statement with the specified OR condition in the WHERE clause.</returns>
         public void Or(string condition)
         {
             _query.Append($"OR {condition} ");
         }
 
         /// <summary>
-        /// Adds a parameter and its value for use in the SQL query.
+        /// Records a parameter name for <see cref="QueryBuildResult.Parameters"/>.
         /// </summary>
+        /// <remarks>
+        /// Only the name reaches the build result; the value is not returned, so bind it yourself when the query runs.
+        /// </remarks>
         /// <param name="parameterName">The name of the parameter.</param>
         /// <param name="value">The value of the parameter.</param>
         public void AddParameter(string parameterName, object value)
@@ -114,6 +116,9 @@ namespace SQLServerInteraction
         /// </summary>
         /// <param name="columns">A comma-separated list of columns to order by.</param>
         /// <param name="sortOrder">The sort order for the columns (default is ascending).</param>
+        /// <remarks>
+        /// Appends the sort order as <c>ASCENDING</c> or <c>DESCENDING</c>, which T-SQL does not accept.
+        /// </remarks>
         public void OrderBy(string columns, SortOrder sortOrder = SortOrder.Ascending)
         {
             _query.Append($"ORDER BY {columns} {sortOrder.ToString().ToUpper()} ");
@@ -159,10 +164,10 @@ namespace SQLServerInteraction
         }
 
         /// <summary>
-        /// Adds an AVG aggregate function to the SQL statement for the specified column with an alias.
+        /// Adds a MIN aggregate function to the SQL statement for the specified column with an alias.
         /// </summary>
-        /// <param name="columnName">The name of the column to calculate the average.</param>
-        /// <param name="alias">The alias for the AVG result.</param>
+        /// <param name="columnName">The name of the column to calculate the minimum value.</param>
+        /// <param name="alias">The alias for the MIN result.</param>
         public void Min(string columnName, string alias)
         {
             _query.Append($"MIN({columnName}) AS {alias}");
@@ -182,6 +187,9 @@ namespace SQLServerInteraction
         /// Creates a subquery within the current SQL statement using a new instance of the QueryBuilder.
         /// </summary>
         /// <returns>A new QueryBuilder instance representing the subquery.</returns>
+        /// <remarks>
+        /// <see cref="Build"/> appends the subquery's type name, not its SQL.
+        /// </remarks>
         public QueryBuilder CreateSubquery()
         {
             var subquery = new QueryBuilder();
@@ -200,6 +208,9 @@ namespace SQLServerInteraction
         /// <summary>
         /// Ends a nested condition within the SQL WHERE clause.
         /// </summary>
+        /// <remarks>
+        /// Appends <c>()</c>; the conditions added since <see cref="StartNestedCondition"/> are not wrapped.
+        /// </remarks>
         /// <exception cref="InvalidOperationException">Thrown when attempting to end a nested condition without starting one.</exception>
         public void EndNestedCondition()
         {
@@ -214,6 +225,11 @@ namespace SQLServerInteraction
         /// <summary>
         /// Enables pagination for the SQL statement, specifying the page number and page size.
         /// </summary>
+        /// <param name="page">The page number, starting at 1.</param>
+        /// <param name="pageSize">The number of rows per page.</param>
+        /// <remarks>
+        /// <see cref="Build"/> appends <c>OFFSET ... ROWS FETCH NEXT ... ROWS ONLY</c>, which needs an ORDER BY clause.
+        /// </remarks>
         public void Paginate(int page, int pageSize)
         {
             _usePagination = true;
@@ -224,7 +240,10 @@ namespace SQLServerInteraction
         /// <summary>
         /// Starts a CASE statement for conditional logic within the SQL statement.
         /// </summary>
-        /// <param name="columnName">The name of the column to apply the CASE statement.</param>
+        /// <param name="columnName">The expression placed after <c>CASE</c>, which makes it a simple CASE that compares this expression with each WHEN value.</param>
+        /// <remarks>
+        /// The finished CASE is appended where <see cref="EndCaseStatement"/> is called.
+        /// </remarks>
         public void StartCaseStatement(string columnName)
         {
             _useCaseStatement = true;
@@ -301,8 +320,11 @@ namespace SQLServerInteraction
         /// <summary>
         /// Builds the final SQL statement based on the constructed query and parameters.
         /// </summary>
-        /// <returns>A QueryBuildResult containing the generated SQL statement and formatted parameters.</returns>
-        /// <exception cref="InvalidOperationException">Thrown when the SQL statement is not valid (missing SELECT or FROM clause).</exception>
+        /// <returns>A QueryBuildResult containing the generated SQL statement and the parameter names.</returns>
+        /// <exception cref="InvalidOperationException">Thrown when the text does not contain both SELECT and FROM.</exception>
+        /// <remarks>
+        /// Subqueries, pagination and open nested conditions are appended to the builder's own text, so a second call repeats them.
+        /// </remarks>
         public QueryBuildResult Build()
         {
             if (!_query.ToString().Contains("SELECT", StringComparison.CurrentCultureIgnoreCase) || !_query.ToString().Contains("FROM", StringComparison.CurrentCultureIgnoreCase))
@@ -367,7 +389,7 @@ namespace SQLServerInteraction
         public string? SQL { get; set; }
 
         /// <summary>
-        /// Gets or sets the formatted parameters for the SQL statement.
+        /// Gets or sets the parameter names recorded with <see cref="QueryBuilder.AddParameter"/>, as a comma-separated list such as <c>@A, @B</c>. Values are not included.
         /// </summary>
         public string? Parameters { get; set; }
     }

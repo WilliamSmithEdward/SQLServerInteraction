@@ -6,9 +6,9 @@ namespace SQLServerInteraction
     public partial class SQLServerInstance
     {
         /// <summary>
-        /// Retrieves the names of stored procedures in the SQL Server database.
+        /// Retrieves the names of stored procedures and functions in the SQL Server database (INFORMATION_SCHEMA.ROUTINES).
         /// </summary>
-        /// <returns>A list of stored procedure names in the database.</returns>
+        /// <returns>A list of stored procedure and function names in the database, without schema names.</returns>
         public List<string> GetStoredProcedures()
         {
             using var connection = new SqlConnection(_connectionString);

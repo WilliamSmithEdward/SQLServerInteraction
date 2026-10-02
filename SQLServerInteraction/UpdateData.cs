@@ -7,9 +7,9 @@ namespace SQLServerInteraction
         /// <summary>
         /// Updates records in a SQL Server table.
         /// </summary>
-        /// <param name="sqlServerTableName">The name of the SQL Server table to update.</param>
-        /// <param name="valuesToUpdate">A dictionary containing column names and their corresponding values to update. "[My Field]" is OK.</param>
-        /// <param name="condition">An optional condition to filter which records to update. Defaults to "1 = 1" if not provided.</param>
+        /// <param name="sqlServerTableName">The name of the SQL Server table to update, inserted into the SQL as written, without quoting or escaping.</param>
+        /// <param name="valuesToUpdate">A dictionary containing column names and their corresponding values to update. The values are sent as parameters; the keys are inserted into the SQL as written, without quoting or escaping, so bracket a name that needs it ("[My Field]"). Pass DBNull.Value, not null, for NULL.</param>
+        /// <param name="condition">An optional condition to filter which records to update. SQL text without the WHERE keyword, inserted into the SQL as written, without quoting or escaping. Defaults to "1 = 1", updating every row, if not provided.</param>
         public void UpdateData(string sqlServerTableName, Dictionary<string, object> valuesToUpdate, string condition = "")
         {
             string setClause = string.Join(", ", valuesToUpdate.Select(kvp => $"{kvp.Key} = @{kvp.Key.Replace(" ", "_").Replace("[","").Replace("]","")}"));

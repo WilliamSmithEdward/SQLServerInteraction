@@ -5,9 +5,9 @@ namespace SQLServerInteraction
     public partial class SQLServerInstance
     {
         /// <summary>
-        /// Restores a database from a specified backup file.
+        /// Restores the database named in the connection string from a specified backup file, with no RESTORE options.
         /// </summary>
-        /// <param name="backupFilePath">The file path to the database backup.</param>
+        /// <param name="backupFilePath">The path of the backup on the SQL Server machine, inserted into the SQL as written, without quoting or escaping.</param>
         public void RestoreDatabase(string backupFilePath)
         {
             using var connection = new SqlConnection(_connectionString);

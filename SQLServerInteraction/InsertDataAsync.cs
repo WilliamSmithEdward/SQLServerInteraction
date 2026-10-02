@@ -7,8 +7,8 @@ namespace SQLServerInteraction
         /// <summary>
         /// Inserts data into a SQL Server table asynchronously using a dictionary of column names and corresponding values.
         /// </summary>
-        /// <param name="sqlServerTableName">The name of the SQL Server table to insert data into.</param>
-        /// <param name="values">A dictionary containing column names and corresponding values for insertion.</param>
+        /// <param name="sqlServerTableName">The name of the SQL Server table to insert data into, inserted into the SQL as written, without quoting or escaping.</param>
+        /// <param name="values">A dictionary containing column names and corresponding values for insertion. The values are sent as parameters; the keys are inserted into the SQL as written, without quoting or escaping, so bracket a name that needs it ("[My Field]"). Pass DBNull.Value, not null, for NULL.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
         public async Task InsertDataAsync(string sqlServerTableName, Dictionary<string, object> values)
         {

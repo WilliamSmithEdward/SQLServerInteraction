@@ -5,9 +5,9 @@ namespace SQLServerInteraction
     public partial class SQLServerInstance
     {
         /// <summary>
-        /// Checks whether a table with the specified name exists in the database.
+        /// Checks whether a table or view with the specified name exists in any schema of the database.
         /// </summary>
-        /// <param name="tableName">The name of the table to check.</param>
+        /// <param name="tableName">The name of the table to check, without a schema, placed between quotes in the SQL as written, without escaping.</param>
         /// <returns>True if the table exists; otherwise, false.</returns>
         public bool DoesTableExist(string tableName)
         {
