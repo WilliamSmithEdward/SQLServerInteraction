@@ -1,28 +1,16 @@
-﻿using Microsoft.Data.SqlClient;
-
-namespace SQLServerInteraction
+﻿namespace SQLServerInteraction
 {
     public partial class SQLServerInstance
     {
         /// <summary>
-        /// Retrieves the primary key column of a table in the SQL Server database.
+        /// Retrieves the first primary key column of a table in the SQL Server database.
         /// </summary>
-        /// <param name="tableName">The name of the table for which to retrieve the primary key column, placed between quotes in the SQL as written, without escaping.</param>
-        /// <returns>The name of one primary key column for the specified table (only one, for a composite key), or null if not found.</returns>
+        /// <param name="tableName">The name of the table, sent as parameters. A bare name (<c>Sales</c>) matches in any schema; <c>dbo.Sales</c> or <c>[dbo].[Sales]</c> matches that schema only.</param>
+        /// <returns>The first column of the primary key in key order, which for a composite key is one of several (see <see cref="GetTablePrimaryKeyColumns"/>), or null if the table has no primary key or does not exist.</returns>
+        /// <exception cref="ArgumentException">The name is not a valid one-, two- or three-part name.</exception>
         public string? GetTablePrimaryKeyColumn(string tableName)
         {
-            using var connection = new SqlConnection(_connectionString);
-            connection.Open();
-
-            string sql = $@"SELECT COLUMN_NAME 
-                    FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE 
-                    WHERE OBJECTPROPERTY(OBJECT_ID(CONSTRAINT_SCHEMA + '.' + CONSTRAINT_NAME), 'IsPrimaryKey') = 1 
-                    AND TABLE_NAME = '{tableName}'";
-
-            using var command = new SqlCommand(sql, connection);
-
-            var result = command.ExecuteScalar();
-            return result?.ToString();
+            return GetTablePrimaryKeyColumns(tableName).FirstOrDefault();
         }
     }
 }

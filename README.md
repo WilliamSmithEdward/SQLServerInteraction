@@ -12,9 +12,9 @@ Everything is in the `SQLServerInteraction` namespace.
 
 ## Read this first: what is and is not parameterized
 
-Values you pass in a parameter dictionary or a `SqlParameter` array are sent as SQL parameters. Everything else is pasted into the SQL text as written: table names, column names (the keys of the insert and update dictionaries), conditions, index names, file paths, and the `sql` strings you pass to the query methods. The library does not quote, escape or validate any of them.
+Values you pass in a parameter dictionary or a `SqlParameter` array are sent as SQL parameters. Table, column, index and database names are quoted as identifiers, so a name is only ever read as a name. Backup paths are sent as parameters.
 
-Only pass those strings from your own code. If any part of one comes from a user, a file or another system, check it against a list of names you expect before calling the method. The section "Methods that build SQL from your strings", further down, lists every method that builds SQL this way.
+Some strings are SQL by design and are run as written: the `sql` strings you pass to the query and command methods, the conditions of `UpdateData`, `DeleteData` and `BulkCopy`, and every string `QueryBuilder` takes, table names included. Build them in your own code, and put any value that comes from a user, a file or another system in the parameters instead. The section "Methods that run your SQL", further down, lists them.
 
 ---
 
@@ -25,16 +25,16 @@ Pass a connection string, or build one with `SQLServerConnectionString`:
 ```csharp
 using SQLServerInteraction;
 
-// Windows authentication (Trusted_Connection=True)
+// Windows authentication (Integrated Security)
 var trusted = new SQLServerConnectionString("your-server", "YourDatabase");
 Console.WriteLine(trusted.GetConnectionString());
-// Server=your-server;Database=YourDatabase;Trusted_Connection=True;Encrypt=True;;
+// Data Source=your-server;Initial Catalog=YourDatabase;Integrated Security=True;Encrypt=True
 
 // SQL Server authentication, encryption off, one extra keyword
 var login = new SQLServerConnectionString("your-server", "YourDatabase", "your-user", "your-password",
     encrypt: false, additionalParameters: "TrustServerCertificate=True;");
 Console.WriteLine(login.GetConnectionString());
-// Server=your-server;Database=YourDatabase;User Id=your-user;Password=your-password;Encrypt=False;;TrustServerCertificate=True;
+// Data Source=your-server;Initial Catalog=YourDatabase;User ID=your-user;Password=your-password;Encrypt=False;Trust Server Certificate=True
 
 var db = new SQLServerInstance(trusted);
 var db2 = new SQLServerInstance("Server=your-server;Database=YourDatabase;Trusted_Connection=True;Encrypt=True;");
@@ -42,11 +42,10 @@ var db2 = new SQLServerInstance("Server=your-server;Database=YourDatabase;Truste
 
 How `GetConnectionString()` builds the string:
 
+- It uses SqlClient's `SqlConnectionStringBuilder`, so a value containing `;`, `=` or a quote, such as a password, is quoted and reaches the server as written.
 - `Encrypt` defaults to `true`.
-- A null or empty `UserId` gives `Trusted_Connection=True`, and the password is ignored. Otherwise the string carries `User Id` and `Password`.
-- `additionalParameters` is appended at the end as written, so end each keyword with `;`.
-- Nothing is validated or escaped. A value containing `;`, such as a password, breaks the string: SqlClient then throws `ArgumentException` when the connection string is parsed. Use `SqlConnectionStringBuilder` and the string constructor of `SQLServerInstance` for such values.
-- The empty `;;` after `Encrypt` is harmless; SqlClient skips it.
+- A null or empty `UserId` gives `Integrated Security=True`, and the password is ignored. Otherwise the string carries `User ID` and `Password`.
+- `additionalParameters` is parsed as a connection string and merged in. Each of its keywords replaces the one the other arguments set, as it did when 1.x appended it to the end, so `"Encrypt=Strict"` there gives strict encryption. Text that is not a valid connection string, or an unknown keyword, throws `ArgumentException`.
 
 Constructing a `SQLServerInstance` does not connect. Each method call opens its own `SqlConnection` and disposes it before returning, so connection pooling is whatever the connection string sets (SqlClient pools by default). Commands use SqlClient's default 30-second command timeout; apart from `BulkCopy`, no method takes a timeout or a `CancellationToken`.
 
@@ -78,7 +77,7 @@ decimal total = await db.ExecuteScalarAsync<decimal>("SELECT SUM(Total) FROM dbo
 ```
 
 - `ExecuteQuery<T>` and `ExecuteQueryAsync<T>` read only the first column and convert each value with `Convert.ChangeType`. A NULL becomes `""` for `string` and throws `InvalidCastException` for a value type.
-- `ExecuteScalar<T>` and `ExecuteScalarAsync<T>` return `default(T)` when the query returns no rows or a NULL, and otherwise convert the value with `Convert.ChangeType`. That conversion cannot target a nullable type, so `ExecuteScalar<int?>` throws `InvalidCastException` whenever the value is not NULL. Ask for `int` and expect `0` for no rows or NULL.
+- `ExecuteScalar<T>` and `ExecuteScalarAsync<T>` return `default(T)` when the query returns no rows or a NULL, and otherwise convert the value with `Convert.ChangeType`. A nullable type converts to its underlying type, so `ExecuteScalar<int?>` returns the number, or null for no rows or NULL.
 - None of these four take parameters. To filter on a value, use `ExecuteQueryToObjectList<T>` below, which does.
 
 ### Mapping rows to objects
@@ -130,7 +129,7 @@ var db = new SQLServerInstance(new SQLServerConnectionString("your-server", "You
 db.ExecuteSQL("UPDATE dbo.Orders SET Archived = 1 WHERE OrderDate < '2020-01-01'");
 await db.ExecuteSQLAsync("EXEC dbo.RefreshTotals");
 
-// Dictionary keys are parameter names WITHOUT the @
+// Dictionary keys are parameter names, with or without the @
 db.ExecuteNonQueryWithParameters(
     "UPDATE dbo.Orders SET Status = @Status WHERE OrderId = @OrderId",
     new Dictionary<string, object> { ["Status"] = "Shipped", ["OrderId"] = 42 });
@@ -146,8 +145,8 @@ db.ExecuteStoredProcedure("dbo.RebuildIndexes");
 ```
 
 - None of these return the number of rows affected or any result set; use `ExecuteQuery` or `ExecuteScalar<T>` to read data back. `ExecuteParameterizedQuery` runs a command, not a query, despite its name.
-- `ExecuteNonQueryWithParameters` adds `@` to each key, so a key that already starts with `@` becomes `@@name` and the command fails.
-- A null dictionary value is not sent as NULL: SqlClient omits the parameter and the server reports it missing. Pass `DBNull.Value` instead.
+- Every method that takes a parameter dictionary names the parameters the same way: the `@` is added only when the key lacks it, so `"Status"` and `"@Status"` are both `@Status`.
+- A null dictionary value is sent as SQL NULL, as `DBNull.Value` is.
 - The `SqlParameter` methods use the array you pass; a `SqlParameter` can belong to only one command, so build new ones for each call.
 
 ### Transactions
@@ -186,29 +185,32 @@ using SQLServerInteraction;
 
 var db = new SQLServerInstance(new SQLServerConnectionString("your-server", "YourDatabase"));
 
-// Column name -> value. Bracket names that need it.
+// Column name -> value
 db.InsertData("dbo.Customers", new Dictionary<string, object>
 {
     ["CustomerId"] = 7,
-    ["[Customer Name]"] = "Contoso",
+    ["Customer Name"] = "Contoso",
     ["LastOrder"] = DBNull.Value,
 });
 
+// The condition is SQL; its values go in the last argument
 db.UpdateData("dbo.Customers",
-    new Dictionary<string, object> { ["[Customer Name]"] = "Contoso Ltd" },
-    "CustomerId = 7");
+    new Dictionary<string, object> { ["Customer Name"] = "Contoso Ltd" },
+    "CustomerId = @Id",
+    new Dictionary<string, object> { ["Id"] = 7 });
 
-db.DeleteData("dbo.Customers", "CustomerId = 7");
+db.DeleteData("dbo.Customers", "CustomerId = @Id", new Dictionary<string, object> { ["Id"] = 7 });
 
 // One object -> one row
 await db.InsertDataAsync(new Customer { CustomerId = 8, Name = "Fabrikam" }, "dbo.Customers");
 ```
 
-- The values are sent as parameters. The table name, the column names and the condition are pasted into the SQL as written.
-- Each dictionary key is used twice: as the column name in the SQL, and, with spaces turned into `_` and brackets removed, as the parameter name. A column name that needs brackets must have them in the key, and a key that is not a valid parameter name once spaces and brackets are handled (one with a `-` or `.` in it, for example) fails.
-- A null value is not sent as NULL (see above); use `DBNull.Value`.
-- `UpdateData` and `DeleteData` take the condition as SQL text without the `WHERE` keyword. **An empty condition means every row**: `DeleteData("dbo.Customers")` deletes the whole table.
-- `InsertData<T>` and `InsertDataAsync<T>` insert one row with a column for every public property of `T`, named exactly as the property. They ignore `SQLServerInstance.Column`, so the example above writes to a column called `Name`. A null property value is sent as NULL. Include only properties that have columns; an identity column fails unless `IDENTITY_INSERT` is on.
+- Table names can have one, two or three parts (`Customers`, `dbo.Customers`, `MyDb.dbo.Customers`), each plain or in brackets (`[dbo].[My Customers]`). Every part is quoted, so a name with a space or any other character works and cannot change the SQL. A malformed name (an empty part, an unclosed bracket, more than three parts, a part over 128 characters) throws `ArgumentException`.
+- Each dictionary key is one column name, plain or bracketed (`Customer Name` or `[Customer Name]`), and is quoted the same way. Bracket a column name that contains a dot. The values are sent as parameters named `@__value_0`, `@__value_1` and so on, so do not give condition parameters those names.
+- A null value is sent as NULL, as `DBNull.Value` is.
+- `UpdateData` and `DeleteData` take the condition as SQL text without the `WHERE` keyword, run as written. An overload of each (and of the async versions) takes a dictionary of parameters for the condition as its last argument. Parameter names work with or without the `@`, and null is sent as NULL.
+- The condition is required. An empty or whitespace condition throws `ArgumentException` instead of affecting every row; to update or delete every row, pass `"1 = 1"`.
+- `InsertData<T>` and `InsertDataAsync<T>` insert one row with a column for every public instance property of `T` that has a getter, named by its `SQLServerInstance.Column` attribute or else by the property, so the example above writes to `Customer Name`. Static properties and indexers are left out. A null property value is sent as NULL. Include only properties that have columns; an identity column fails unless `IDENTITY_INSERT` is on.
 - None of these return the number of rows affected.
 
 ### Bulk copy
@@ -231,17 +233,19 @@ db.BulkCopy(table, "dbo.Orders");
 // Delete the rows matching the condition first, then copy, in one transaction
 await db.BulkCopyAsync(table, "dbo.Orders",
     flushTable: true,
-    flushWhereClauseCondition: "OrderDate >= '2026-01-01'",
+    flushWhereClauseCondition: "OrderDate >= @From",
+    flushParameters: new Dictionary<string, object> { ["From"] = new DateTime(2026, 1, 1) },
     bulkCopyTimeout: 120,
     batchSize: 5000);
 ```
 
-`BulkCopy` and `BulkCopyAsync` write the rows with `SqlBulkCopy`. Columns map by position, not by name, so the DataTable's columns must be in the destination table's order.
+`BulkCopy` and `BulkCopyAsync` write the rows with `SqlBulkCopy`. Columns map by position, not by name, so the DataTable's columns must be in the destination table's order. The table name is quoted as described above, for the `DELETE` and for `SqlBulkCopy`.
 
 | Parameter | Default | Effect |
 |---|---|---|
 | `flushTable` | `false` | Delete rows from the destination before copying. |
-| `flushWhereClauseCondition` | `null` | With `flushTable`, delete only the rows matching this condition (SQL text without `WHERE`). Without it, every row is deleted. |
+| `flushWhereClauseCondition` | `null` | With `flushTable`, delete only the rows matching this condition (SQL text without `WHERE`, run as written). Left null, every row is deleted. An empty or whitespace string throws `ArgumentException`. |
+| `flushParameters` | none | Parameters for `flushWhereClauseCondition`, taken by an overload whose first five arguments are `dataTable`, `destinationTableName`, `flushTable`, `flushWhereClauseCondition` and `flushParameters`. Names work with or without the `@`, and null is sent as NULL. |
 | `bulkCopyTimeout` | `30` | Seconds the copy may take before it fails. |
 | `batchSize` | `null` | Rows per batch sent to the server. `null` sends all rows in one batch. |
 | `useTransaction` | `true` | Run the delete and the copy in one transaction, rolled back if either fails, so readers never see the table half-written. With `false`, a failure can leave the table emptied or partly filled. |
@@ -275,8 +279,8 @@ await db.RestoreDatabaseAsync(@"D:\Backups\YourDatabase.bak");
 ```
 
 - Both act on the database named in the connection string. The path is a path on the SQL Server machine, not on the machine running your code, and the server's service account needs access to it.
-- `BackupDatabase` runs `BACKUP DATABASE [db] TO DISK = 'path'` with no options, so a second backup to the same file is appended to it.
-- `RestoreDatabase` runs `USE master; RESTORE DATABASE [db] FROM DISK = 'path'` with no options (no `REPLACE`, no `MOVE`). It fails if any other connection is using the database, and idle pooled connections from this process count.
+- `BackupDatabase` runs `BACKUP DATABASE @database TO DISK = @path` with no options, the name and path sent as parameters, so a second backup to the same file is appended to it.
+- `RestoreDatabase` switches its connection to `master`, then runs `RESTORE DATABASE @database FROM DISK = @path` with no options (no `REPLACE`, no `MOVE`). It fails if any other connection is using the database, and idle pooled connections from this process count: call `SqlConnection.ClearAllPools()` first.
 - `GetLastBackupDateTime` returns the latest `backup_finish_date` in `msdb.dbo.backupset` for the current database, or null if there is none. It needs read access to msdb.
 
 ---
@@ -286,99 +290,47 @@ await db.RestoreDatabaseAsync(@"D:\Backups\YourDatabase.bak");
 | Method | Returns |
 |---|---|
 | `DoesDatabaseExist(databaseName)` | `true` if a database of that name exists on the server, ignoring case. |
-| `DoesTableExist(tableName)` | `true` if any schema has a table or view with that name (`INFORMATION_SCHEMA.TABLES`). |
+| `DoesTableExist(tableName)` | `true` if a table or view with that name exists (`INFORMATION_SCHEMA.TABLES`). |
 | `GetTableNames()` | The names of all tables and views in the database, without schema names. |
-| `GetColumnNames(tableName)` | The column names of every table or view with that name, in any schema. |
-| `GetTableColumns(tableName)` | Column name to data type name (`int`, `nvarchar`, ...), from `INFORMATION_SCHEMA.COLUMNS`. |
+| `GetColumnNames(tableName)` | The column names of every table or view with that name. |
+| `GetTableColumns(tableName)` | Column name to data type name (`int`, `nvarchar`, ...), from `INFORMATION_SCHEMA.COLUMNS`, in column order. |
 | `GetTableSchema(tableName)` | An empty `DataTable` with the table's columns, types and key, from `SqlDataAdapter.FillSchema`. |
-| `GetTablePrimaryKeyColumn(tableName)` | The name of one primary key column, or null. For a composite key, only one of its columns. |
+| `GetTablePrimaryKeyColumn(tableName)` | The first column of the primary key in key order, or null. For a composite key, only that one. |
+| `GetTablePrimaryKeyColumns(tableName)` | Every column of the primary key, in key order, or an empty list. |
 | `GetTableIndexs(tableName)` | The names of the table's non-clustered indexes that are not the primary key. Clustered indexes are not listed. |
 | `GetTableRowCount(tableName)` | `SELECT COUNT(*)` for the table, as an `int`. |
 | `GetStoredProcedures()` | The names of all stored procedures and functions (`INFORMATION_SCHEMA.ROUTINES`), without schema names. |
 | `GetStoredProcedureParameters(storedProcedureName)` | The procedure's parameter names, with their `@`, from `SqlCommandBuilder.DeriveParameters`. The return value is left out. |
 | `GetDatabaseInformation()` | A dictionary with `DatabaseName`, `DatabaseId`, `CreationDate` (formatted with the current culture) and `Collation`. |
-| `GetDatabaseSizeInBytes()` | The total size of the database's data and log files **in kilobytes**, despite the name (`SUM(size) * 8` from `sys.master_files`, where `size` counts 8 KB pages). Needs permission to read `sys.master_files`. |
-| `IndexCreate(tableName, columnName)` | Nothing. Runs `CREATE INDEX IX_<column> ON <table> (<column>)`. |
-| `IndexDrop(tableName, indexName)` | Nothing. Runs `DROP INDEX <index> ON <table>`. |
+| `GetDatabaseSizeInBytes()` | The total size of the database's data and log files in bytes (`SUM(size) * 8192` from `sys.master_files`, where `size` counts 8 KB pages). Before 2.0.0 it returned kilobytes. Needs permission to read `sys.master_files`. |
+| `IndexCreate(tableName, columnName)` | Nothing. Runs `CREATE INDEX [IX_<column>] ON <table> ([<column>])`. |
+| `IndexDrop(tableName, indexName)` | Nothing. Runs `DROP INDEX [<index>] ON <table>`. |
 
-Table names may include the schema (`dbo.Orders`) for `GetTableSchema`, `GetTableRowCount`, `GetTableIndexs`, `IndexCreate` and `IndexDrop`, which paste the name into SQL. `DoesTableExist`, `GetColumnNames`, `GetTableColumns` and `GetTablePrimaryKeyColumn` compare it with the bare table name, so pass `Orders`, not `dbo.Orders`.
+Every table name takes the forms described under "Inserting, updating and deleting": one to three parts, plain or bracketed. `GetTableSchema`, `GetTableRowCount`, `IndexCreate` and `IndexDrop` quote it into the SQL, and `GetTableIndexs` passes the quoted name to `OBJECT_ID` as a parameter, so a bare name there means the default schema. `DoesTableExist`, `GetColumnNames`, `GetTableColumns`, `GetTablePrimaryKeyColumn` and `GetTablePrimaryKeyColumns` compare the parts with the catalog as parameters: a bare name (`Orders`) matches a table of that name in any schema, and `dbo.Orders` matches only the one in `dbo`.
 
 ---
 
-## Methods that build SQL from your strings
+## Methods that run your SQL
 
-These methods put caller strings into SQL text without parameters. Treat every string listed here as code.
+These methods run SQL text you write. Treat every string listed here as code: build it in your own code, and send anything else as a parameter.
 
-| Method (and its async version) | Strings pasted into SQL |
+| Method (and its async version) | SQL run as written |
 |---|---|
-| `ExecuteQuery`, `ExecuteQuery<T>`, `ExecuteScalar<T>`, `ExecuteSQL`, `ExecuteTransaction`, `ExportDataToCSVAsync`, `ExecuteScriptFromFileAsync` (file contents) | the SQL itself, by design |
-| `InsertData` | table name, dictionary keys |
-| `InsertData<T>` | table name (column names come from the type) |
-| `UpdateData` | table name, dictionary keys, condition |
-| `DeleteData` | table name, condition |
-| `BulkCopy` | table name and `flushWhereClauseCondition` in the `DELETE`; the table name also goes to `SqlBulkCopy` |
-| `BackupDatabase`, `RestoreDatabase` | backup file path, inside `'...'` |
-| `DoesTableExist`, `GetTableColumns`, `GetTablePrimaryKeyColumn`, `GetTableIndexs` | table name, inside `'...'` |
-| `GetTableRowCount`, `GetTableSchema` | table name |
-| `IndexCreate` | table name, column name |
-| `IndexDrop` | table name, index name |
+| `ExecuteQuery`, `ExecuteQuery<T>`, `ExecuteScalar<T>`, `ExecuteSQL`, `ExecuteTransaction`, `ExportDataToCSVAsync`, `ExecuteScriptFromFileAsync` (file contents) | the SQL itself |
+| `ExecuteNonQueryWithParameters`, `ExecuteParameterizedQuery`, `ExecuteQueryToObjectList<T>` | the SQL itself; values go as parameters |
+| `UpdateData`, `DeleteData` | the condition; its values can go in the parameters dictionary their overloads take |
+| `BulkCopy` | `flushWhereClauseCondition`; its values can go in `flushParameters` |
 | `QueryBuilder` (every method) | every string |
 
-`ExecuteNonQueryWithParameters`, `ExecuteParameterizedQuery`, `ExecuteStoredProcedure` and `ExecuteQueryToObjectList<T>` send values as parameters but still run the SQL text or procedure name you give them. `DoesDatabaseExist`, `GetColumnNames`, `GetTableNames`, `GetStoredProcedures` and `GetStoredProcedureParameters` pass names to SqlClient as parameters.
+`ExecuteStoredProcedure` and `GetStoredProcedureParameters` send the procedure name to SqlClient as a procedure name (`CommandType.StoredProcedure`), not as a batch. Every other name the library takes, of a table, column, index or database, is quoted or sent as a parameter.
 
 ---
 
 ## QueryBuilder
 
-`QueryBuilder` appends clauses to a string in the order you call its methods, and `Build()` returns the text. It does not check the SQL, quote anything or talk to a server. Each call appends its keyword and your text followed by a space, so the order of calls is the order of the clauses.
+`QueryBuilder` assembles a SELECT statement from SQL fragments, and `Build()` returns the text with the parameters you recorded. Every string it takes is SQL and is placed as written, table names included: build those strings in your own code and pass values with `AddParameter`. It does not talk to a server.
 
-```csharp
-using SQLServerInteraction;
-
-var queryBuilder = new QueryBuilder();
-queryBuilder.Select("CustomerId, OrderDate, TotalAmount");
-queryBuilder.From("Orders");
-queryBuilder.Where("Status = 'Shipped'");
-queryBuilder.And("TotalAmount > @MinAmount");
-queryBuilder.Or("TotalAmount > (SELECT AVG(TotalAmount) FROM Orders)");
-queryBuilder.AddParameter("MinAmount", 100);
-
-QueryBuildResult result = queryBuilder.Build();
-Console.WriteLine(result.SQL);
-// SELECT CustomerId, OrderDate, TotalAmount FROM Orders WHERE Status = 'Shipped' AND TotalAmount > @MinAmount OR TotalAmount > (SELECT AVG(TotalAmount) FROM Orders)
-Console.WriteLine(result.Parameters);
-// @MinAmount
-```
-
-```csharp
-using SQLServerInteraction;
-
-var queryBuilder = new QueryBuilder();
-queryBuilder.Select("Orders.OrderId, Customers.CustomerName");
-queryBuilder.From("Orders");
-queryBuilder.Join("Customers", "Orders.CustomerId = Customers.CustomerId", JoinType.Left);
-
-Console.WriteLine(queryBuilder.Build().SQL);
-// SELECT Orders.OrderId, Customers.CustomerName FROM Orders LEFT JOIN Customers ON Orders.CustomerId = Customers.CustomerId
-```
-
-```csharp
-using SQLServerInteraction;
-
-var queryBuilder = new QueryBuilder();
-queryBuilder.Select("Category, COUNT(*) AS TotalProducts");
-queryBuilder.From("Products");
-queryBuilder.GroupBy("Category");
-
-Console.WriteLine(queryBuilder.Build().SQL);
-// SELECT Category, COUNT(*) AS TotalProducts FROM Products GROUP BY Category
-```
-
-- `Select()` with no argument selects `*`.
-- `Join` takes `JoinType.Inner` (the default), `Left`, `Right` or `Full`.
-- `Build()` throws `InvalidOperationException` unless the text contains `SELECT` and `FROM` somewhere (a plain substring test).
-- `Build()` appends to the builder's text as it runs, so call it once and keep the result.
-- `AddParameter` records only the name. `QueryBuildResult.Parameters` is a string such as `"@MinAmount, @MaxAmount"`; the values are not returned. Bind them yourself when you run the query:
+The SELECT list comes first: the columns given to `Select`, then any aggregates and CASE expressions, in call order and separated by commas. The other clauses follow in the order you call their methods, each as its keyword, your text and a space.
 
 ```csharp
 using SQLServerInteraction;
@@ -389,24 +341,90 @@ var queryBuilder = new QueryBuilder();
 queryBuilder.Select("CustomerId, [Customer Name], LastOrder");
 queryBuilder.From("dbo.Customers");
 queryBuilder.Where("Region = @Region");
+queryBuilder.StartNestedCondition();
+queryBuilder.And("LastOrder >= @Since");
+queryBuilder.Or("LastOrder IS NULL");
+queryBuilder.EndNestedCondition();
+queryBuilder.OrderBy("CustomerId", QuerySortOrder.Descending);
+queryBuilder.Paginate(page: 2, pageSize: 50);
+queryBuilder.AddParameter("Region", "West");
+queryBuilder.AddParameter("Since", new DateTime(2026, 1, 1));
 
-List<Customer> west = db.ExecuteQueryToObjectList<Customer>(
-    queryBuilder.Build().SQL!,
-    new Dictionary<string, object> { ["Region"] = "West" });
+QueryBuildResult result = queryBuilder.Build();
+Console.WriteLine(result.SQL);
+// SELECT CustomerId, [Customer Name], LastOrder FROM dbo.Customers WHERE Region = @Region AND (LastOrder >= @Since OR LastOrder IS NULL) ORDER BY CustomerId DESC OFFSET 50 ROWS FETCH NEXT 50 ROWS ONLY
+Console.WriteLine(result.Parameters);
+// @Region, @Since
+
+// The values go with the SQL to any method that takes a parameter dictionary
+List<Customer> page = db.ExecuteQueryToObjectList<Customer>(result.SQL!, result.ParameterValues);
 ```
 
-### Known problems
+```csharp
+using SQLServerInteraction;
 
-These methods produce SQL that SQL Server rejects or that does not mean what the method name says. Write those parts of the query by hand instead, for example inside the `Select`, `From` or `Where` text.
+var queryBuilder = new QueryBuilder();
+queryBuilder.Select("Category");
+queryBuilder.Count("*", "Products");
+queryBuilder.Avg("Price", "AveragePrice");
+queryBuilder.StartCaseStatement("");
+queryBuilder.AddCaseWhen("MAX(Price) > 100", "'premium'");
+queryBuilder.AddCaseElse("'standard'");
+queryBuilder.EndCaseStatement("Tier");
+queryBuilder.From("Products");
+queryBuilder.Join("Suppliers s", "s.SupplierId = Products.SupplierId", JoinType.Left);
+queryBuilder.GroupBy("Category");
 
-- `OrderBy` appends `ASCENDING` or `DESCENDING` after the columns (`ORDER BY Price ASCENDING`); T-SQL accepts only `ASC` and `DESC`. Because `Paginate` emits `OFFSET ... FETCH`, which needs `ORDER BY`, it cannot be used either.
-- `Count`, `Sum`, `Avg`, `Min` and `Max` append `COUNT(col) AS alias` with no comma before it and no space after it, so the result runs into the next clause (`SELECT * COUNT(Revenue) AS CountOfRevenueFROM Sales`).
-- `StartNestedCondition` and `EndNestedCondition` do not wrap the conditions between them; `EndNestedCondition` appends `()`.
-- `StartCaseStatement(alias)` starts `CASE alias WHEN ...`, a simple CASE comparing the alias with each condition, and the whole CASE is appended where `EndCaseStatement` is called, usually after `FROM`.
-- `CreateSubquery` appends the subquery's type name, `(SQLServerInteraction.QueryBuildResult)`, instead of its SQL.
-- `Union`, `Intersect` and `Except` put the keyword at the start of the query with nothing before it.
+Console.WriteLine(queryBuilder.Build().SQL);
+// SELECT Category, COUNT(*) AS Products, AVG(Price) AS AveragePrice, CASE WHEN MAX(Price) > 100 THEN 'premium' ELSE 'standard' END AS Tier FROM Products LEFT JOIN Suppliers s ON s.SupplierId = Products.SupplierId GROUP BY Category
+```
 
-The `SortOrder` enum that `OrderBy` takes has the same name as `Microsoft.Data.SqlClient.SortOrder`. A file that imports both namespaces must write `SQLServerInteraction.SortOrder`.
+```csharp
+using SQLServerInteraction;
+
+var queryBuilder = new QueryBuilder();
+queryBuilder.Select("OrderId, Total");
+queryBuilder.From("dbo.Orders");
+queryBuilder.Where("CustomerId IN");
+QueryBuilder customers = queryBuilder.CreateSubquery();
+customers.Select("CustomerId");
+customers.From("dbo.Customers");
+customers.Where("Region = @Region");
+customers.AddParameter("Region", "West");
+
+Console.WriteLine(queryBuilder.Build().SQL);
+// SELECT OrderId, Total FROM dbo.Orders WHERE CustomerId IN (SELECT CustomerId FROM dbo.Customers WHERE Region = @Region)
+```
+
+- `Select()` with no argument selects `*`, unless an aggregate or CASE adds to the list.
+- `Count`, `Sum`, `Avg`, `Min` and `Max` add `FUNC(column) AS alias` to the SELECT list. `Count("*", alias)` counts rows.
+- `StartCaseStatement("")` starts a searched CASE, whose `AddCaseWhen` conditions are predicates. `StartCaseStatement(expression)` starts a simple CASE that compares the expression with each `AddCaseWhen` value. `EndCaseStatement(alias)` adds the CASE to the SELECT list.
+- `StartNestedCondition` opens a parenthesis after the keyword of the next `Where`, `And` or `Or`, and `EndNestedCondition` closes it after the last condition. Nested conditions can nest. `Build()` closes any left open; ending one that holds no condition, or that was never started, throws `InvalidOperationException`.
+- `CreateSubquery` returns a builder whose SQL `Build()` places, in parentheses, where `CreateSubquery` was called. Its parameters come back with the outer query's.
+- `OrderBy` writes `ASC` or `DESC` after the last column. `QuerySortOrder` was called `SortOrder` before 2.0.0, which clashed with `Microsoft.Data.SqlClient.SortOrder`.
+- `Paginate(page, pageSize)` appends `OFFSET ... ROWS FETCH NEXT ... ROWS ONLY` at the end. It needs an `OrderBy`; without one, `Build()` throws `InvalidOperationException`. A page or page size below 1 throws `ArgumentOutOfRangeException`.
+- `Join` takes `JoinType.Inner` (the default), `Left`, `Right` or `Full`.
+- `AddParameter` names work with or without the `@`. `QueryBuildResult.Parameters` lists the names, such as `"@Region, @Since"`, and `QueryBuildResult.ParameterValues` holds the values by name, with null as `DBNull.Value`.
+- `Build()` reads the finished SQL and throws `InvalidOperationException` unless it starts with `SELECT` and has a `FROM` outside parentheses, quotes and comments. It does not change the builder, so calling it again returns the same result.
+
+### Union, Intersect and Except
+
+`Union()`, `Intersect()` and `Except()` are obsolete. They put their keyword in front of the builder's own SQL, so the result is only half of a query, and a single builder cannot hold the other half. Build each query and join the two:
+
+```csharp
+using SQLServerInteraction;
+
+var current = new QueryBuilder();
+current.Select("CustomerId");
+current.From("dbo.Orders");
+
+var archived = new QueryBuilder();
+archived.Select("CustomerId");
+archived.From("dbo.ArchivedOrders");
+
+string sql = current.Build().SQL + "UNION " + archived.Build().SQL;
+// SELECT CustomerId FROM dbo.Orders UNION SELECT CustomerId FROM dbo.ArchivedOrders
+```
 
 ---
 
