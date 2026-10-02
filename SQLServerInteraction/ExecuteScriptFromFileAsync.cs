@@ -5,7 +5,7 @@ namespace SQLServerInteraction
     public partial class SQLServerInstance
     {
         /// <summary>
-        /// Executes a SQL script from a file asynchronously in the SQL Server database.
+        /// Executes a SQL script from a file asynchronously in the SQL Server database, as one batch. GO separators are not supported.
         /// </summary>
         /// <param name="filePath">The path to the file containing the SQL script.</param>
         /// <returns>A task representing the asynchronous operation.</returns>

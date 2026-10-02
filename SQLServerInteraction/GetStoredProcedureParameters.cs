@@ -9,7 +9,7 @@ namespace SQLServerInteraction
         /// Retrieves the names of parameters for a stored procedure in the SQL Server database.
         /// </summary>
         /// <param name="storedProcedureName">The name of the stored procedure for which to retrieve parameters.</param>
-        /// <returns>A list of parameter names for the specified stored procedure.</returns>
+        /// <returns>A list of parameter names, each starting with @, for the specified stored procedure. The return value is not included.</returns>
         public List<string> GetStoredProcedureParameters(string storedProcedureName)
         {
             var parameters = new List<string>();

@@ -7,9 +7,9 @@ namespace SQLServerInteraction
         /// <summary>
         /// Inserts data into a SQL Server table synchronously.
         /// </summary>
-        /// <typeparam name="T">The type of data to insert.</typeparam>
+        /// <typeparam name="T">The type of data to insert. Every public property becomes a column of the same name; <see cref="ColumnAttribute"/> is not used.</typeparam>
         /// <param name="data">The data to be inserted.</param>
-        /// <param name="sqlServerTableName">The name of the SQL Server table to insert data into.</param>
+        /// <param name="sqlServerTableName">The name of the SQL Server table to insert data into, inserted into the SQL as written, without quoting or escaping.</param>
         public void InsertData<T>(T data, string sqlServerTableName) where T : class
         {
             var properties = typeof(T).GetProperties();

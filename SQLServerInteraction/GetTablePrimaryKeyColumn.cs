@@ -7,8 +7,8 @@ namespace SQLServerInteraction
         /// <summary>
         /// Retrieves the primary key column of a table in the SQL Server database.
         /// </summary>
-        /// <param name="tableName">The name of the table for which to retrieve the primary key column.</param>
-        /// <returns>The name of the primary key column for the specified table, or null if not found.</returns>
+        /// <param name="tableName">The name of the table for which to retrieve the primary key column, placed between quotes in the SQL as written, without escaping.</param>
+        /// <returns>The name of one primary key column for the specified table (only one, for a composite key), or null if not found.</returns>
         public string? GetTablePrimaryKeyColumn(string tableName)
         {
             using var connection = new SqlConnection(_connectionString);

@@ -9,7 +9,7 @@ namespace SQLServerInteraction
         /// Retrieves the column names for a specified table in the SQL Server database.
         /// </summary>
         /// <param name="tableName">The name of the table for which to retrieve column names.</param>
-        /// <returns>A list of column names for the specified table.</returns>
+        /// <returns>A list of column names for every table or view with that name, in any schema.</returns>
         public List<string> GetColumnNames(string tableName)
         {
             using var connection = new SqlConnection(_connectionString);

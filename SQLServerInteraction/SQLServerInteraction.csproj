@@ -34,11 +34,13 @@
 	<Nullable>enable</Nullable>
 	<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 	<Title>SQLServerInteraction</Title>
+	<Authors>WilliamSmithE</Authors>
 	<Copyright>William Smith (WilliamSmithE)</Copyright>
-	<Description>SQLServerInteraction is a C# library that wraps the functionality included in Microsoft's "Microsoft.Data.SqlClient" library.</Description>
+	<Description>Helper methods over Microsoft.Data.SqlClient for SQL Server: queries into DataTables, scalars and mapped objects, parameterized commands, transactions, bulk copy, insert, update and delete from dictionaries, CSV export, backup and restore, and schema lookups. The data methods have async versions. Table names, column names and conditions are inserted into the SQL as written.</Description>
 	<PackageProjectUrl>https://github.com/WilliamSmithEdward/SQLServerInteraction</PackageProjectUrl>
-	<RepositoryUrl></RepositoryUrl>
-	<PackageTags>C#;sql;server;sqlserver;wrapper;helper;microsoft;sqlclient;async</PackageTags>
+	<RepositoryUrl>https://github.com/WilliamSmithEdward/SQLServerInteraction</RepositoryUrl>
+	<RepositoryType>git</RepositoryType>
+	<PackageTags>sql;sqlserver;sql-server;sqlclient;microsoft.data.sqlclient;ado.net;bulk-copy;sqlbulkcopy;wrapper;helper;async</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
 	<GenerateDocumentationFile>True</GenerateDocumentationFile>
 	<PackageIcon>SQLServerInteraction.png</PackageIcon>

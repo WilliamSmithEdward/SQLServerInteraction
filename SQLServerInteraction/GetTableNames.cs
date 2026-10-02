@@ -6,9 +6,9 @@ namespace SQLServerInteraction
     public partial class SQLServerInstance
     {
         /// <summary>
-        /// Retrieves the names of tables in the SQL Server database.
+        /// Retrieves the names of tables and views in the SQL Server database.
         /// </summary>
-        /// <returns>A list of table names in the database.</returns>
+        /// <returns>A list of table and view names in the database, without schema names.</returns>
         public List<string> GetTableNames()
         {
             using var connection = new SqlConnection(_connectionString);

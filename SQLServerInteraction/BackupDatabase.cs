@@ -7,7 +7,7 @@ namespace SQLServerInteraction
         /// <summary>
         /// Creates a backup of the current SQL Server database synchronously.
         /// </summary>
-        /// <param name="backupFilePath">The file path where the backup will be saved.</param>
+        /// <param name="backupFilePath">The path on the SQL Server machine where the backup will be saved, inserted into the SQL as written, without quoting or escaping.</param>
         public void BackupDatabase(string backupFilePath)
         {
             using var connection = new SqlConnection(_connectionString);

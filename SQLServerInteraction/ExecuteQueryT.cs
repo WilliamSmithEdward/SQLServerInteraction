@@ -5,7 +5,7 @@ namespace SQLServerInteraction
     public partial class SQLServerInstance
     {
         /// <summary>
-        /// Executes a SQL query and returns the results as a list of specified type <typeparamref name="T"/>.
+        /// Executes a SQL query and returns the first column of every row, converted to <typeparamref name="T"/> with Convert.ChangeType.
         /// </summary>
         /// <typeparam name="T">The type of objects to retrieve from the query results.</typeparam>
         /// <param name="sql">The SQL query to execute.</param>

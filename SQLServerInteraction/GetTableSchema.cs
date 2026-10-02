@@ -8,7 +8,7 @@ namespace SQLServerInteraction
         /// <summary>
         /// Retrieves the schema of a table in the SQL Server database.
         /// </summary>
-        /// <param name="tableName">The name of the table for which the schema is retrieved.</param>
+        /// <param name="tableName">The name of the table for which the schema is retrieved, inserted into the SQL as written, without quoting or escaping.</param>
         /// <returns>A <see cref="System.Data.DataTable"/> containing the schema of the specified table.</returns>
         public DataTable GetTableSchema(string tableName)
         {
