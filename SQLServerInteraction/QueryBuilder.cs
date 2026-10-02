@@ -1,62 +1,63 @@
-﻿using Microsoft.IdentityModel.Tokens;
-using System.Text;
+﻿using System.Text;
 
 namespace SQLServerInteraction
 {
     /// <summary>
     /// Represents a query builder for constructing SQL queries.
     /// </summary>
+    /// <remarks>
+    /// Every string the builder takes is SQL, placed in the query as written: build them in your own code,
+    /// and pass values with <see cref="AddParameter"/>. The SELECT list comes first; the other clauses follow
+    /// in the order their methods are called.
+    /// </remarks>
     public class QueryBuilder
     {
-        private readonly StringBuilder _query;
+        /// <summary>Marks where <see cref="EndNestedCondition"/> closes a parenthesis.</summary>
+        private static readonly object CloseParenthesis = new();
+
+        private readonly List<string> _selectItems;
+        private readonly List<object> _clauses;
         private readonly List<SQLParameter> _parameters;
-        private readonly List<QueryBuilder> _subqueries;
-        private readonly Stack<string> _nestedConditions;
+        private bool _selectCalled;
+        private int _pendingOpenParentheses;
+        private int _openParentheses;
         private bool _isUnion;
         private bool _isIntersect;
         private bool _isExcept;
         private bool _usePagination;
         private int _pageNumber;
         private int _pageSize;
-        private bool _useCaseStatement;
-        private string _caseStatement;
+        private StringBuilder? _caseStatement;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="QueryBuilder"/> class.
         /// </summary>
         public QueryBuilder()
         {
-            _query = new StringBuilder();
+            _selectItems = [];
+            _clauses = [];
             _parameters = [];
-            _subqueries = [];
-            _nestedConditions = new Stack<string>();
-            _isUnion = false;
-            _isIntersect = false;
-            _isExcept = false;
-            _usePagination = false;
             _pageNumber = 1;
             _pageSize = 10;
-            _useCaseStatement = false;
-            _caseStatement = string.Empty;
         }
 
         /// <summary>
         /// Constructs a SELECT SQL statement with the specified columns.
         /// </summary>
-        /// <param name="columns">A comma-separated list of column names. Leave empty for selecting all columns.</param>
+        /// <param name="columns">A comma-separated list of column names. Leave empty for selecting all columns, unless an aggregate or CASE adds to the list.</param>
         public void Select(string columns = "")
         {
-            if (columns.IsNullOrEmpty()) _query.Append($"SELECT * ");
-            else _query.Append($"SELECT {columns} ");
+            _selectCalled = true;
+            if (!string.IsNullOrEmpty(columns)) _selectItems.Add(columns);
         }
 
         /// <summary>
         /// Specifies the table from which to select data in the SQL statement.
         /// </summary>
-        /// <param name="tableName">The name of the table.</param>
+        /// <param name="tableName">The table, as SQL: a name, or a name with an alias.</param>
         public void From(string tableName)
         {
-            _query.Append($"FROM {tableName} ");
+            _clauses.Add($"FROM {tableName} ");
         }
 
         /// <summary>
@@ -65,7 +66,7 @@ namespace SQLServerInteraction
         /// <param name="condition">The condition for the WHERE clause.</param>
         public void Where(string condition)
         {
-            _query.Append($"WHERE {condition} ");
+            AddCondition("WHERE", condition);
         }
 
         /// <summary>
@@ -74,7 +75,7 @@ namespace SQLServerInteraction
         /// <param name="condition">The additional condition to be combined with the existing WHERE clause.</param>
         public void And(string condition)
         {
-            _query.Append($"AND {condition} ");
+            AddCondition("AND", condition);
         }
 
         /// <summary>
@@ -83,45 +84,46 @@ namespace SQLServerInteraction
         /// <param name="condition">The additional condition to be combined with the existing WHERE clause using OR.</param>
         public void Or(string condition)
         {
-            _query.Append($"OR {condition} ");
+            AddCondition("OR", condition);
+        }
+
+        private void AddCondition(string keyword, string condition)
+        {
+            _clauses.Add($"{keyword} {new string('(', _pendingOpenParentheses)}{condition} ");
+            _openParentheses += _pendingOpenParentheses;
+            _pendingOpenParentheses = 0;
         }
 
         /// <summary>
-        /// Records a parameter name for <see cref="QueryBuildResult.Parameters"/>.
+        /// Records a parameter, which <see cref="Build"/> returns with the SQL so the query can run with it.
         /// </summary>
-        /// <remarks>
-        /// Only the name reaches the build result; the value is not returned, so bind it yourself when the query runs.
-        /// </remarks>
-        /// <param name="parameterName">The name of the parameter.</param>
-        /// <param name="value">The value of the parameter.</param>
+        /// <param name="parameterName">The name of the parameter, with or without the @.</param>
+        /// <param name="value">The value of the parameter. Null is sent as NULL.</param>
         public void AddParameter(string parameterName, object value)
         {
-            var parameter = new SQLParameter { Name = parameterName, Value = value };
+            var parameter = new SQLParameter { Name = CommandParameters.Name(parameterName), Value = value };
             _parameters.Add(parameter);
         }
 
         /// <summary>
         /// Adds a join clause to the SQL statement based on the specified table, condition, and join type.
         /// </summary>
-        /// <param name="tableName">The name of the table to join.</param>
+        /// <param name="tableName">The table to join, as SQL: a name, a name with an alias, or a derived table.</param>
         /// <param name="onCondition">The condition for the join.</param>
         /// <param name="joinType">The type of join (default is INNER JOIN).</param>
         public void Join(string tableName, string onCondition, JoinType joinType = JoinType.Inner)
         {
-            _query.Append($"{joinType.ToString().ToUpper()} JOIN {tableName} ON {onCondition} ");
+            _clauses.Add($"{joinType.ToString().ToUpper()} JOIN {tableName} ON {onCondition} ");
         }
 
         /// <summary>
         /// Adds an ORDER BY clause to the SQL statement based on the specified columns and sort order.
         /// </summary>
         /// <param name="columns">A comma-separated list of columns to order by.</param>
-        /// <param name="sortOrder">The sort order for the columns (default is ascending).</param>
-        /// <remarks>
-        /// Appends the sort order as <c>ASCENDING</c> or <c>DESCENDING</c>, which T-SQL does not accept.
-        /// </remarks>
-        public void OrderBy(string columns, SortOrder sortOrder = SortOrder.Ascending)
+        /// <param name="sortOrder">The sort order, written as <c>ASC</c> or <c>DESC</c> after the last column (default is ascending).</param>
+        public void OrderBy(string columns, QuerySortOrder sortOrder = QuerySortOrder.Ascending)
         {
-            _query.Append($"ORDER BY {columns} {sortOrder.ToString().ToUpper()} ");
+            _clauses.Add($"ORDER BY {columns} {(sortOrder == QuerySortOrder.Descending ? "DESC" : "ASC")} ");
         }
 
         /// <summary>
@@ -130,96 +132,96 @@ namespace SQLServerInteraction
         /// <param name="columns">A comma-separated list of columns to group by.</param>
         public void GroupBy(string columns)
         {
-            _query.Append($"GROUP BY {columns} ");
+            _clauses.Add($"GROUP BY {columns} ");
         }
 
         /// <summary>
-        /// Adds a COUNT aggregate function to the SQL statement for the specified column with an alias.
+        /// Adds a COUNT aggregate function to the SELECT list for the specified column with an alias.
         /// </summary>
-        /// <param name="columnName">The name of the column to count.</param>
+        /// <param name="columnName">The name of the column to count, or <c>*</c>.</param>
         /// <param name="alias">The alias for the COUNT result.</param>
         public void Count(string columnName, string alias)
         {
-            _query.Append($"COUNT({columnName}) AS {alias}");
+            _selectItems.Add($"COUNT({columnName}) AS {alias}");
         }
 
         /// <summary>
-        /// Adds a SUM aggregate function to the SQL statement for the specified column with an alias.
+        /// Adds a SUM aggregate function to the SELECT list for the specified column with an alias.
         /// </summary>
         /// <param name="columnName">The name of the column to sum.</param>
         /// <param name="alias">The alias for the SUM result.</param>
         public void Sum(string columnName, string alias)
         {
-            _query.Append($"SUM({columnName}) AS {alias}");
+            _selectItems.Add($"SUM({columnName}) AS {alias}");
         }
 
         /// <summary>
-        /// Adds an AVG aggregate function to the SQL statement for the specified column with an alias.
+        /// Adds an AVG aggregate function to the SELECT list for the specified column with an alias.
         /// </summary>
         /// <param name="columnName">The name of the column to calculate the average.</param>
         /// <param name="alias">The alias for the AVG result.</param>
         public void Avg(string columnName, string alias)
         {
-            _query.Append($"AVG({columnName}) AS {alias}");
+            _selectItems.Add($"AVG({columnName}) AS {alias}");
         }
 
         /// <summary>
-        /// Adds a MIN aggregate function to the SQL statement for the specified column with an alias.
+        /// Adds a MIN aggregate function to the SELECT list for the specified column with an alias.
         /// </summary>
         /// <param name="columnName">The name of the column to calculate the minimum value.</param>
         /// <param name="alias">The alias for the MIN result.</param>
         public void Min(string columnName, string alias)
         {
-            _query.Append($"MIN({columnName}) AS {alias}");
+            _selectItems.Add($"MIN({columnName}) AS {alias}");
         }
 
         /// <summary>
-        /// Adds a MAX aggregate function to the SQL statement for the specified column with an alias.
+        /// Adds a MAX aggregate function to the SELECT list for the specified column with an alias.
         /// </summary>
         /// <param name="columnName">The name of the column to calculate the maximum value.</param>
         /// <param name="alias">The alias for the MAX result.</param>
         public void Max(string columnName, string alias)
         {
-            _query.Append($"MAX({columnName}) AS {alias}" );
+            _selectItems.Add($"MAX({columnName}) AS {alias}");
         }
 
         /// <summary>
-        /// Creates a subquery within the current SQL statement using a new instance of the QueryBuilder.
+        /// Creates a subquery at this point of the query, using a new instance of the QueryBuilder.
         /// </summary>
-        /// <returns>A new QueryBuilder instance representing the subquery.</returns>
+        /// <returns>A new QueryBuilder for the subquery. <see cref="Build"/> places its SQL here, in parentheses, and returns its parameters with the outer query's.</returns>
         /// <remarks>
-        /// <see cref="Build"/> appends the subquery's type name, not its SQL.
+        /// Call it where the subquery belongs, for example after <c>Where("CustomerId IN")</c>.
         /// </remarks>
         public QueryBuilder CreateSubquery()
         {
             var subquery = new QueryBuilder();
-            _subqueries.Add(subquery);
+            _clauses.Add(subquery);
             return subquery;
         }
 
         /// <summary>
-        /// Starts a nested condition within the SQL WHERE clause.
+        /// Starts a nested condition within the SQL WHERE clause: the next WHERE, AND or OR condition opens a parenthesis after its keyword.
         /// </summary>
         public void StartNestedCondition()
         {
-            _nestedConditions.Push("(");
+            _pendingOpenParentheses++;
         }
 
         /// <summary>
-        /// Ends a nested condition within the SQL WHERE clause.
+        /// Ends a nested condition within the SQL WHERE clause, closing the parenthesis after the last condition.
         /// </summary>
-        /// <remarks>
-        /// Appends <c>()</c>; the conditions added since <see cref="StartNestedCondition"/> are not wrapped.
-        /// </remarks>
-        /// <exception cref="InvalidOperationException">Thrown when attempting to end a nested condition without starting one.</exception>
+        /// <exception cref="InvalidOperationException">Thrown when attempting to end a nested condition without starting one, or one with no condition in it.</exception>
         public void EndNestedCondition()
         {
-            if (_nestedConditions.Count == 0)
+            if (_openParentheses == 0)
+            {
+                if (_pendingOpenParentheses > 0)
+                    throw new InvalidOperationException("The nested condition has no condition in it.");
                 throw new InvalidOperationException("No nested condition to end.");
+            }
 
-            var nestedCondition = _nestedConditions.Pop();
-            _query.Append(nestedCondition);
-            _query.Append(") ");
+            _openParentheses--;
+            _clauses.Add(CloseParenthesis);
         }
 
         /// <summary>
@@ -230,38 +232,38 @@ namespace SQLServerInteraction
         /// <remarks>
         /// <see cref="Build"/> appends <c>OFFSET ... ROWS FETCH NEXT ... ROWS ONLY</c>, which needs an ORDER BY clause.
         /// </remarks>
+        /// <exception cref="ArgumentOutOfRangeException"><paramref name="page"/> or <paramref name="pageSize"/> is less than 1.</exception>
         public void Paginate(int page, int pageSize)
         {
+            ArgumentOutOfRangeException.ThrowIfLessThan(page, 1);
+            ArgumentOutOfRangeException.ThrowIfLessThan(pageSize, 1);
             _usePagination = true;
             _pageNumber = page;
             _pageSize = pageSize;
         }
 
         /// <summary>
-        /// Starts a CASE statement for conditional logic within the SQL statement.
+        /// Starts a CASE expression for the SELECT list. <see cref="EndCaseStatement"/> adds it to the list.
         /// </summary>
-        /// <param name="columnName">The expression placed after <c>CASE</c>, which makes it a simple CASE that compares this expression with each WHEN value.</param>
-        /// <remarks>
-        /// The finished CASE is appended where <see cref="EndCaseStatement"/> is called.
-        /// </remarks>
+        /// <param name="columnName">
+        /// An empty string for a searched CASE, <c>CASE WHEN condition THEN result ... END</c>, whose WHEN clauses are conditions.
+        /// Otherwise the expression placed after <c>CASE</c>, which makes it a simple CASE that compares this expression with each WHEN value.
+        /// </param>
         public void StartCaseStatement(string columnName)
         {
-            _useCaseStatement = true;
-            _caseStatement = $"CASE {columnName} ";
+            _caseStatement = new StringBuilder("CASE ");
+            if (!string.IsNullOrEmpty(columnName)) _caseStatement.Append(columnName).Append(' ');
         }
 
         /// <summary>
         /// Adds a WHEN-THEN clause to the current CASE statement within the SQL statement.
         /// </summary>
-        /// <param name="condition">The condition for the WHEN clause.</param>
+        /// <param name="condition">The condition for the WHEN clause, or the value to compare with in a simple CASE.</param>
         /// <param name="result">The result for the THEN clause.</param>
         /// <exception cref="InvalidOperationException">Thrown when attempting to add a WHEN-THEN clause without starting a CASE statement.</exception>
         public void AddCaseWhen(string condition, string result)
         {
-            if (!_useCaseStatement)
-                throw new InvalidOperationException("CASE statement not started. Call StartCaseStatement first.");
-
-            _caseStatement += $"WHEN {condition} THEN {result} ";
+            CurrentCase().Append($"WHEN {condition} THEN {result} ");
         }
 
         /// <summary>
@@ -271,47 +273,45 @@ namespace SQLServerInteraction
         /// <exception cref="InvalidOperationException">Thrown when attempting to add an ELSE clause without starting a CASE statement.</exception>
         public void AddCaseElse(string result)
         {
-            if (!_useCaseStatement)
-                throw new InvalidOperationException("CASE statement not started. Call StartCaseStatement first.");
-
-            _caseStatement += $"ELSE {result} ";
+            CurrentCase().Append($"ELSE {result} ");
         }
 
         /// <summary>
-        /// Ends the current CASE statement within the SQL statement and provides an alias for the result.
+        /// Ends the current CASE statement and adds it to the SELECT list, with an alias for the result.
         /// </summary>
         /// <param name="alias">The alias for the CASE statement result.</param>
         /// <exception cref="InvalidOperationException">Thrown when attempting to end a CASE statement without starting one.</exception>
         public void EndCaseStatement(string alias)
         {
-            if (!_useCaseStatement)
-                throw new InvalidOperationException("CASE statement not started. Call StartCaseStatement first.");
-
-            _caseStatement += $"END AS {alias} ";
-            _useCaseStatement = false;
-            _query.Append(_caseStatement);
-            _caseStatement = string.Empty;
+            _selectItems.Add($"{CurrentCase()}END AS {alias}");
+            _caseStatement = null;
         }
 
+        private StringBuilder CurrentCase() =>
+            _caseStatement ?? throw new InvalidOperationException("CASE statement not started. Call StartCaseStatement first.");
+
         /// <summary>
-        /// Marks the SQL statement as a UNION query.
+        /// Marks the SQL statement as a UNION query: <see cref="Build"/> puts <c>UNION</c> before it.
         /// </summary>
+        [Obsolete("Union only puts UNION before this query's SQL; it does not combine two builders. Build each query and join their SQL with \" UNION \". See the README.")]
         public void Union()
         {
             _isUnion = true;
         }
 
         /// <summary>
-        /// Marks the SQL statement as an INTERSECT query.
+        /// Marks the SQL statement as an INTERSECT query: <see cref="Build"/> puts <c>INTERSECT</c> before it.
         /// </summary>
+        [Obsolete("Intersect only puts INTERSECT before this query's SQL; it does not combine two builders. Build each query and join their SQL with \" INTERSECT \". See the README.")]
         public void Intersect()
         {
             _isIntersect = true;
         }
 
         /// <summary>
-        /// Marks the SQL statement as an EXCEPT query.
+        /// Marks the SQL statement as an EXCEPT query: <see cref="Build"/> puts <c>EXCEPT</c> before it.
         /// </summary>
+        [Obsolete("Except only puts EXCEPT before this query's SQL; it does not combine two builders. Build each query and join their SQL with \" EXCEPT \". See the README.")]
         public void Except()
         {
             _isExcept = true;
@@ -319,61 +319,115 @@ namespace SQLServerInteraction
 
         /// <summary>
         /// Builds the final SQL statement based on the constructed query and parameters.
+        /// The builder is not changed, so a second call returns the same result.
         /// </summary>
-        /// <returns>A QueryBuildResult containing the generated SQL statement and the parameter names.</returns>
-        /// <exception cref="InvalidOperationException">Thrown when the text does not contain both SELECT and FROM.</exception>
-        /// <remarks>
-        /// Subqueries, pagination and open nested conditions are appended to the builder's own text, so a second call repeats them.
-        /// </remarks>
+        /// <returns>A QueryBuildResult containing the generated SQL statement, the parameter names and the parameter values.</returns>
+        /// <exception cref="InvalidOperationException">Thrown when the SQL has no SELECT at its start or no FROM outside parentheses, quotes and comments, or when it is paginated without an ORDER BY.</exception>
         public QueryBuildResult Build()
         {
-            if (!_query.ToString().Contains("SELECT", StringComparison.CurrentCultureIgnoreCase) || !_query.ToString().Contains("FROM", StringComparison.CurrentCultureIgnoreCase))
+            var parameters = new List<SQLParameter>();
+            string sql = BuildSql(parameters);
+
+            if (!SqlShape.IsSelectFrom(sql))
                 throw new InvalidOperationException("A valid SELECT statement with FROM clause is required.");
 
-            var formattedParameters = new StringBuilder();
-            foreach (var parameter in _parameters)
+            return new QueryBuildResult
             {
-                formattedParameters.Append($"@{parameter.Name}, ");
+                SQL = sql,
+                Parameters = string.Join(", ", parameters.Select(p => p.Name)),
+                ParameterValues = parameters.GroupBy(p => p.Name).ToDictionary(g => g.Key, g => CommandParameters.Value(g.Last().Value)),
+            };
+        }
+
+        /// <summary>
+        /// The SQL of this builder and its subqueries, collecting their parameters, without changing any builder.
+        /// </summary>
+        private string BuildSql(List<SQLParameter> parameters)
+        {
+            var query = new StringBuilder();
+
+            if (_selectCalled || _selectItems.Count > 0)
+            {
+                query.Append("SELECT ").Append(SelectList()).Append(' ');
             }
 
-            var parametersString = formattedParameters.ToString().TrimEnd(' ', ',');
-
-            foreach (var subquery in _subqueries)
+            bool hasOrderBy = false;
+            foreach (var clause in _clauses)
             {
-                _query.Append($"({subquery.Build()}) ");
+                if (clause == CloseParenthesis)
+                {
+                    TrimEnd(query);
+                    query.Append(") ");
+                }
+                else if (clause is QueryBuilder subquery)
+                {
+                    query.Append('(').Append(subquery.BuildSql(parameters).TrimEnd()).Append(") ");
+                }
+                else
+                {
+                    string text = (string)clause;
+                    hasOrderBy |= text.StartsWith("ORDER BY ", StringComparison.Ordinal);
+                    query.Append(text);
+                }
+            }
+
+            if (_openParentheses > 0)
+            {
+                TrimEnd(query);
+                query.Append(new string(')', _openParentheses)).Append(' ');
             }
 
             if (_usePagination)
             {
-                _query.Append($"OFFSET {(_pageNumber - 1) * _pageSize} ROWS FETCH NEXT {_pageSize} ROWS ONLY ");
-            }
-
-            while (_nestedConditions.Count > 0)
-            {
-                var nestedCondition = _nestedConditions.Pop();
-                _query.Append(nestedCondition);
-                _query.Append(") ");
+                if (!hasOrderBy)
+                    throw new InvalidOperationException("Paginate needs an ORDER BY clause: call OrderBy first.");
+                query.Append($"OFFSET {(_pageNumber - 1) * _pageSize} ROWS FETCH NEXT {_pageSize} ROWS ONLY ");
             }
 
             if (_isUnion)
-                _query.Insert(0, "UNION ");
+                query.Insert(0, "UNION ");
             else if (_isIntersect)
-                _query.Insert(0, "INTERSECT ");
+                query.Insert(0, "INTERSECT ");
             else if (_isExcept)
-                _query.Insert(0, "EXCEPT ");
+                query.Insert(0, "EXCEPT ");
 
-            var queryString = _query.ToString();
+            parameters.AddRange(_parameters);
+            return query.ToString();
+        }
 
-            return new QueryBuildResult
+        /// <summary>
+        /// The SELECT list: the columns given to <see cref="Select"/>, then aggregates and CASE expressions in call order,
+        /// separated by commas; <c>*</c> when there are none.
+        /// </summary>
+        private string SelectList()
+        {
+            if (_selectItems.Count == 0) return "*";
+
+            var list = new StringBuilder(_selectItems[0]);
+            foreach (string item in _selectItems.Skip(1))
             {
-                SQL = queryString,
-                Parameters = parametersString
-            };
+                if (list.ToString().TrimEnd().EndsWith(','))
+                {
+                    TrimEnd(list);
+                    list.Append(' ');
+                }
+                else
+                {
+                    list.Append(", ");
+                }
+                list.Append(item);
+            }
+            return list.ToString();
+        }
+
+        private static void TrimEnd(StringBuilder text)
+        {
+            while (text.Length > 0 && char.IsWhiteSpace(text[^1])) text.Length--;
         }
 
         private class SQLParameter
         {
-            public string? Name { get; set; }
+            public string Name { get; set; } = "";
             public object? Value { get; set; }
         }
     }
@@ -389,9 +443,15 @@ namespace SQLServerInteraction
         public string? SQL { get; set; }
 
         /// <summary>
-        /// Gets or sets the parameter names recorded with <see cref="QueryBuilder.AddParameter"/>, as a comma-separated list such as <c>@A, @B</c>. Values are not included.
+        /// Gets or sets the parameter names recorded with <see cref="QueryBuilder.AddParameter"/>, as a comma-separated list such as <c>@A, @B</c>.
         /// </summary>
         public string? Parameters { get; set; }
+
+        /// <summary>
+        /// Gets or sets the parameters recorded with <see cref="QueryBuilder.AddParameter"/>, by name with the @, null values as DBNull.Value.
+        /// Pass it with <see cref="SQL"/> to a method that takes a parameter dictionary, such as <see cref="SQLServerInstance.ExecuteQueryToObjectList{T}"/>.
+        /// </summary>
+        public Dictionary<string, object> ParameterValues { get; set; } = [];
     }
 
     /// <summary>
@@ -421,9 +481,10 @@ namespace SQLServerInteraction
     }
 
     /// <summary>
-    /// Specifies the sort order for ordering query results.
+    /// Specifies the sort order for <see cref="QueryBuilder.OrderBy"/>. Named so that it does not clash with
+    /// Microsoft.Data.SqlClient.SortOrder; before 2.0.0 it was SQLServerInteraction.SortOrder.
     /// </summary>
-    public enum SortOrder
+    public enum QuerySortOrder
     {
         /// <summary>
         /// Represents an ascending sort order in the query.

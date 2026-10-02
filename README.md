@@ -14,7 +14,7 @@ Everything is in the `SQLServerInteraction` namespace.
 
 Values you pass in a parameter dictionary or a `SqlParameter` array are sent as SQL parameters. Table, column, index and database names are quoted as identifiers, so a name is only ever read as a name. Backup paths are sent as parameters.
 
-Two kinds of string are SQL by design and are run as written: the `sql` strings you pass to the query and command methods, and the conditions of `UpdateData`, `DeleteData` and `BulkCopy`. Build them in your own code, and put any value that comes from a user, a file or another system in the parameters instead. The section "Methods that run your SQL", further down, lists them.
+Some strings are SQL by design and are run as written: the `sql` strings you pass to the query and command methods, the conditions of `UpdateData`, `DeleteData` and `BulkCopy`, and every string `QueryBuilder` takes, table names included. Build them in your own code, and put any value that comes from a user, a file or another system in the parameters instead. The section "Methods that run your SQL", further down, lists them.
 
 ---
 
@@ -328,55 +328,9 @@ These methods run SQL text you write. Treat every string listed here as code: bu
 
 ## QueryBuilder
 
-`QueryBuilder` appends clauses to a string in the order you call its methods, and `Build()` returns the text. It does not check the SQL, quote anything or talk to a server. Each call appends its keyword and your text followed by a space, so the order of calls is the order of the clauses.
+`QueryBuilder` assembles a SELECT statement from SQL fragments, and `Build()` returns the text with the parameters you recorded. Every string it takes is SQL and is placed as written, table names included: build those strings in your own code and pass values with `AddParameter`. It does not talk to a server.
 
-```csharp
-using SQLServerInteraction;
-
-var queryBuilder = new QueryBuilder();
-queryBuilder.Select("CustomerId, OrderDate, TotalAmount");
-queryBuilder.From("Orders");
-queryBuilder.Where("Status = 'Shipped'");
-queryBuilder.And("TotalAmount > @MinAmount");
-queryBuilder.Or("TotalAmount > (SELECT AVG(TotalAmount) FROM Orders)");
-queryBuilder.AddParameter("MinAmount", 100);
-
-QueryBuildResult result = queryBuilder.Build();
-Console.WriteLine(result.SQL);
-// SELECT CustomerId, OrderDate, TotalAmount FROM Orders WHERE Status = 'Shipped' AND TotalAmount > @MinAmount OR TotalAmount > (SELECT AVG(TotalAmount) FROM Orders)
-Console.WriteLine(result.Parameters);
-// @MinAmount
-```
-
-```csharp
-using SQLServerInteraction;
-
-var queryBuilder = new QueryBuilder();
-queryBuilder.Select("Orders.OrderId, Customers.CustomerName");
-queryBuilder.From("Orders");
-queryBuilder.Join("Customers", "Orders.CustomerId = Customers.CustomerId", JoinType.Left);
-
-Console.WriteLine(queryBuilder.Build().SQL);
-// SELECT Orders.OrderId, Customers.CustomerName FROM Orders LEFT JOIN Customers ON Orders.CustomerId = Customers.CustomerId
-```
-
-```csharp
-using SQLServerInteraction;
-
-var queryBuilder = new QueryBuilder();
-queryBuilder.Select("Category, COUNT(*) AS TotalProducts");
-queryBuilder.From("Products");
-queryBuilder.GroupBy("Category");
-
-Console.WriteLine(queryBuilder.Build().SQL);
-// SELECT Category, COUNT(*) AS TotalProducts FROM Products GROUP BY Category
-```
-
-- `Select()` with no argument selects `*`.
-- `Join` takes `JoinType.Inner` (the default), `Left`, `Right` or `Full`.
-- `Build()` throws `InvalidOperationException` unless the text contains `SELECT` and `FROM` somewhere (a plain substring test).
-- `Build()` appends to the builder's text as it runs, so call it once and keep the result.
-- `AddParameter` records only the name. `QueryBuildResult.Parameters` is a string such as `"@MinAmount, @MaxAmount"`; the values are not returned. Bind them yourself when you run the query:
+The SELECT list comes first: the columns given to `Select`, then any aggregates and CASE expressions, in call order and separated by commas. The other clauses follow in the order you call their methods, each as its keyword, your text and a space.
 
 ```csharp
 using SQLServerInteraction;
@@ -387,24 +341,90 @@ var queryBuilder = new QueryBuilder();
 queryBuilder.Select("CustomerId, [Customer Name], LastOrder");
 queryBuilder.From("dbo.Customers");
 queryBuilder.Where("Region = @Region");
+queryBuilder.StartNestedCondition();
+queryBuilder.And("LastOrder >= @Since");
+queryBuilder.Or("LastOrder IS NULL");
+queryBuilder.EndNestedCondition();
+queryBuilder.OrderBy("CustomerId", QuerySortOrder.Descending);
+queryBuilder.Paginate(page: 2, pageSize: 50);
+queryBuilder.AddParameter("Region", "West");
+queryBuilder.AddParameter("Since", new DateTime(2026, 1, 1));
 
-List<Customer> west = db.ExecuteQueryToObjectList<Customer>(
-    queryBuilder.Build().SQL!,
-    new Dictionary<string, object> { ["Region"] = "West" });
+QueryBuildResult result = queryBuilder.Build();
+Console.WriteLine(result.SQL);
+// SELECT CustomerId, [Customer Name], LastOrder FROM dbo.Customers WHERE Region = @Region AND (LastOrder >= @Since OR LastOrder IS NULL) ORDER BY CustomerId DESC OFFSET 50 ROWS FETCH NEXT 50 ROWS ONLY
+Console.WriteLine(result.Parameters);
+// @Region, @Since
+
+// The values go with the SQL to any method that takes a parameter dictionary
+List<Customer> page = db.ExecuteQueryToObjectList<Customer>(result.SQL!, result.ParameterValues);
 ```
 
-### Known problems
+```csharp
+using SQLServerInteraction;
 
-These methods produce SQL that SQL Server rejects or that does not mean what the method name says. Write those parts of the query by hand instead, for example inside the `Select`, `From` or `Where` text.
+var queryBuilder = new QueryBuilder();
+queryBuilder.Select("Category");
+queryBuilder.Count("*", "Products");
+queryBuilder.Avg("Price", "AveragePrice");
+queryBuilder.StartCaseStatement("");
+queryBuilder.AddCaseWhen("MAX(Price) > 100", "'premium'");
+queryBuilder.AddCaseElse("'standard'");
+queryBuilder.EndCaseStatement("Tier");
+queryBuilder.From("Products");
+queryBuilder.Join("Suppliers s", "s.SupplierId = Products.SupplierId", JoinType.Left);
+queryBuilder.GroupBy("Category");
 
-- `OrderBy` appends `ASCENDING` or `DESCENDING` after the columns (`ORDER BY Price ASCENDING`); T-SQL accepts only `ASC` and `DESC`. Because `Paginate` emits `OFFSET ... FETCH`, which needs `ORDER BY`, it cannot be used either.
-- `Count`, `Sum`, `Avg`, `Min` and `Max` append `COUNT(col) AS alias` with no comma before it and no space after it, so the result runs into the next clause (`SELECT * COUNT(Revenue) AS CountOfRevenueFROM Sales`).
-- `StartNestedCondition` and `EndNestedCondition` do not wrap the conditions between them; `EndNestedCondition` appends `()`.
-- `StartCaseStatement(alias)` starts `CASE alias WHEN ...`, a simple CASE comparing the alias with each condition, and the whole CASE is appended where `EndCaseStatement` is called, usually after `FROM`.
-- `CreateSubquery` appends the subquery's type name, `(SQLServerInteraction.QueryBuildResult)`, instead of its SQL.
-- `Union`, `Intersect` and `Except` put the keyword at the start of the query with nothing before it.
+Console.WriteLine(queryBuilder.Build().SQL);
+// SELECT Category, COUNT(*) AS Products, AVG(Price) AS AveragePrice, CASE WHEN MAX(Price) > 100 THEN 'premium' ELSE 'standard' END AS Tier FROM Products LEFT JOIN Suppliers s ON s.SupplierId = Products.SupplierId GROUP BY Category
+```
 
-The `SortOrder` enum that `OrderBy` takes has the same name as `Microsoft.Data.SqlClient.SortOrder`. A file that imports both namespaces must write `SQLServerInteraction.SortOrder`.
+```csharp
+using SQLServerInteraction;
+
+var queryBuilder = new QueryBuilder();
+queryBuilder.Select("OrderId, Total");
+queryBuilder.From("dbo.Orders");
+queryBuilder.Where("CustomerId IN");
+QueryBuilder customers = queryBuilder.CreateSubquery();
+customers.Select("CustomerId");
+customers.From("dbo.Customers");
+customers.Where("Region = @Region");
+customers.AddParameter("Region", "West");
+
+Console.WriteLine(queryBuilder.Build().SQL);
+// SELECT OrderId, Total FROM dbo.Orders WHERE CustomerId IN (SELECT CustomerId FROM dbo.Customers WHERE Region = @Region)
+```
+
+- `Select()` with no argument selects `*`, unless an aggregate or CASE adds to the list.
+- `Count`, `Sum`, `Avg`, `Min` and `Max` add `FUNC(column) AS alias` to the SELECT list. `Count("*", alias)` counts rows.
+- `StartCaseStatement("")` starts a searched CASE, whose `AddCaseWhen` conditions are predicates. `StartCaseStatement(expression)` starts a simple CASE that compares the expression with each `AddCaseWhen` value. `EndCaseStatement(alias)` adds the CASE to the SELECT list.
+- `StartNestedCondition` opens a parenthesis after the keyword of the next `Where`, `And` or `Or`, and `EndNestedCondition` closes it after the last condition. Nested conditions can nest. `Build()` closes any left open; ending one that holds no condition, or that was never started, throws `InvalidOperationException`.
+- `CreateSubquery` returns a builder whose SQL `Build()` places, in parentheses, where `CreateSubquery` was called. Its parameters come back with the outer query's.
+- `OrderBy` writes `ASC` or `DESC` after the last column. `QuerySortOrder` was called `SortOrder` before 2.0.0, which clashed with `Microsoft.Data.SqlClient.SortOrder`.
+- `Paginate(page, pageSize)` appends `OFFSET ... ROWS FETCH NEXT ... ROWS ONLY` at the end. It needs an `OrderBy`; without one, `Build()` throws `InvalidOperationException`. A page or page size below 1 throws `ArgumentOutOfRangeException`.
+- `Join` takes `JoinType.Inner` (the default), `Left`, `Right` or `Full`.
+- `AddParameter` names work with or without the `@`. `QueryBuildResult.Parameters` lists the names, such as `"@Region, @Since"`, and `QueryBuildResult.ParameterValues` holds the values by name, with null as `DBNull.Value`.
+- `Build()` reads the finished SQL and throws `InvalidOperationException` unless it starts with `SELECT` and has a `FROM` outside parentheses, quotes and comments. It does not change the builder, so calling it again returns the same result.
+
+### Union, Intersect and Except
+
+`Union()`, `Intersect()` and `Except()` are obsolete. They put their keyword in front of the builder's own SQL, so the result is only half of a query, and a single builder cannot hold the other half. Build each query and join the two:
+
+```csharp
+using SQLServerInteraction;
+
+var current = new QueryBuilder();
+current.Select("CustomerId");
+current.From("dbo.Orders");
+
+var archived = new QueryBuilder();
+archived.Select("CustomerId");
+archived.From("dbo.ArchivedOrders");
+
+string sql = current.Build().SQL + "UNION " + archived.Build().SQL;
+// SELECT CustomerId FROM dbo.Orders UNION SELECT CustomerId FROM dbo.ArchivedOrders
+```
 
 ---
 
