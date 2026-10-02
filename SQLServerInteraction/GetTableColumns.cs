@@ -7,8 +7,9 @@ namespace SQLServerInteraction
         /// <summary>
         /// Retrieves the names and data types of columns for a table in the SQL Server database.
         /// </summary>
-        /// <param name="tableName">The name of the table for which to retrieve columns, placed between quotes in the SQL as written, without escaping.</param>
+        /// <param name="tableName">The name of the table, sent as parameters. A bare name (<c>Sales</c>) matches in any schema; <c>dbo.Sales</c> or <c>[dbo].[Sales]</c> matches that schema only.</param>
         /// <returns>A dictionary where keys are column names and values are data types for the specified table.</returns>
+        /// <exception cref="ArgumentException">The name is not a valid one-, two- or three-part name.</exception>
         public Dictionary<string, string> GetTableColumns(string tableName)
         {
             var columns = new Dictionary<string, string>();
@@ -16,9 +17,11 @@ namespace SQLServerInteraction
             using var connection = new SqlConnection(_connectionString);
             connection.Open();
 
-            string sql = $"SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '{tableName}'";
+            using var command = new SqlCommand(
+                "SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = @table AND (@schema IS NULL OR TABLE_SCHEMA = @schema) AND (@database IS NULL OR TABLE_CATALOG = @database) ORDER BY ORDINAL_POSITION",
+                connection);
+            CommandParameters.AddTableName(command, tableName);
 
-            using var command = new SqlCommand(sql, connection);
             using var reader = command.ExecuteReader();
 
             while (reader.Read())

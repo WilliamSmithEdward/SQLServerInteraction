@@ -12,9 +12,9 @@ Everything is in the `SQLServerInteraction` namespace.
 
 ## Read this first: what is and is not parameterized
 
-Values you pass in a parameter dictionary or a `SqlParameter` array are sent as SQL parameters. Everything else is pasted into the SQL text as written: table names, column names (the keys of the insert and update dictionaries), conditions, index names, file paths, and the `sql` strings you pass to the query methods. The library does not quote, escape or validate any of them.
+Values you pass in a parameter dictionary or a `SqlParameter` array are sent as SQL parameters. Table, column, index and database names are quoted as identifiers, so a name is only ever read as a name. Backup paths are sent as parameters.
 
-Only pass those strings from your own code. If any part of one comes from a user, a file or another system, check it against a list of names you expect before calling the method. The section "Methods that build SQL from your strings", further down, lists every method that builds SQL this way.
+Two kinds of string are SQL by design and are run as written: the `sql` strings you pass to the query and command methods, and the conditions of `UpdateData`, `DeleteData` and `BulkCopy`. Build them in your own code, and put any value that comes from a user, a file or another system in the parameters instead. The section "Methods that run your SQL", further down, lists them.
 
 ---
 
@@ -186,28 +186,31 @@ using SQLServerInteraction;
 
 var db = new SQLServerInstance(new SQLServerConnectionString("your-server", "YourDatabase"));
 
-// Column name -> value. Bracket names that need it.
+// Column name -> value
 db.InsertData("dbo.Customers", new Dictionary<string, object>
 {
     ["CustomerId"] = 7,
-    ["[Customer Name]"] = "Contoso",
+    ["Customer Name"] = "Contoso",
     ["LastOrder"] = DBNull.Value,
 });
 
+// The condition is SQL; its values go in the last argument
 db.UpdateData("dbo.Customers",
-    new Dictionary<string, object> { ["[Customer Name]"] = "Contoso Ltd" },
-    "CustomerId = 7");
+    new Dictionary<string, object> { ["Customer Name"] = "Contoso Ltd" },
+    "CustomerId = @Id",
+    new Dictionary<string, object> { ["Id"] = 7 });
 
-db.DeleteData("dbo.Customers", "CustomerId = 7");
+db.DeleteData("dbo.Customers", "CustomerId = @Id", new Dictionary<string, object> { ["Id"] = 7 });
 
 // One object -> one row
 await db.InsertDataAsync(new Customer { CustomerId = 8, Name = "Fabrikam" }, "dbo.Customers");
 ```
 
-- The values are sent as parameters. The table name, the column names and the condition are pasted into the SQL as written.
-- Each dictionary key is used twice: as the column name in the SQL, and, with spaces turned into `_` and brackets removed, as the parameter name. A column name that needs brackets must have them in the key, and a key that is not a valid parameter name once spaces and brackets are handled (one with a `-` or `.` in it, for example) fails.
+- Table names can have one, two or three parts (`Customers`, `dbo.Customers`, `MyDb.dbo.Customers`), each plain or in brackets (`[dbo].[My Customers]`). Every part is quoted, so a name with a space or any other character works and cannot change the SQL. A malformed name (an empty part, an unclosed bracket, more than three parts, a part over 128 characters) throws `ArgumentException`.
+- Each dictionary key is one column name, plain or bracketed (`Customer Name` or `[Customer Name]`), and is quoted the same way. Bracket a column name that contains a dot. The values are sent as parameters named `@__value_0`, `@__value_1` and so on, so do not give condition parameters those names.
 - A null value is not sent as NULL (see above); use `DBNull.Value`.
-- `UpdateData` and `DeleteData` take the condition as SQL text without the `WHERE` keyword. **An empty condition means every row**: `DeleteData("dbo.Customers")` deletes the whole table.
+- `UpdateData` and `DeleteData` take the condition as SQL text without the `WHERE` keyword, run as written, and an optional dictionary of parameters for it. Parameter names work with or without the `@`, and null is sent as NULL.
+- The condition is required. An empty or whitespace condition throws `ArgumentException` instead of affecting every row; to update or delete every row, pass `"1 = 1"`.
 - `InsertData<T>` and `InsertDataAsync<T>` insert one row with a column for every public property of `T`, named exactly as the property. They ignore `SQLServerInstance.Column`, so the example above writes to a column called `Name`. A null property value is sent as NULL. Include only properties that have columns; an identity column fails unless `IDENTITY_INSERT` is on.
 - None of these return the number of rows affected.
 
@@ -231,17 +234,19 @@ db.BulkCopy(table, "dbo.Orders");
 // Delete the rows matching the condition first, then copy, in one transaction
 await db.BulkCopyAsync(table, "dbo.Orders",
     flushTable: true,
-    flushWhereClauseCondition: "OrderDate >= '2026-01-01'",
+    flushWhereClauseCondition: "OrderDate >= @From",
+    flushParameters: new Dictionary<string, object> { ["From"] = new DateTime(2026, 1, 1) },
     bulkCopyTimeout: 120,
     batchSize: 5000);
 ```
 
-`BulkCopy` and `BulkCopyAsync` write the rows with `SqlBulkCopy`. Columns map by position, not by name, so the DataTable's columns must be in the destination table's order.
+`BulkCopy` and `BulkCopyAsync` write the rows with `SqlBulkCopy`. Columns map by position, not by name, so the DataTable's columns must be in the destination table's order. The table name is quoted as described above, for the `DELETE` and for `SqlBulkCopy`.
 
 | Parameter | Default | Effect |
 |---|---|---|
 | `flushTable` | `false` | Delete rows from the destination before copying. |
-| `flushWhereClauseCondition` | `null` | With `flushTable`, delete only the rows matching this condition (SQL text without `WHERE`). Without it, every row is deleted. |
+| `flushWhereClauseCondition` | `null` | With `flushTable`, delete only the rows matching this condition (SQL text without `WHERE`, run as written). Left null, every row is deleted. An empty or whitespace string throws `ArgumentException`. |
+| `flushParameters` | `null` | Parameters for `flushWhereClauseCondition`. Names work with or without the `@`, and null is sent as NULL. |
 | `bulkCopyTimeout` | `30` | Seconds the copy may take before it fails. |
 | `batchSize` | `null` | Rows per batch sent to the server. `null` sends all rows in one batch. |
 | `useTransaction` | `true` | Run the delete and the copy in one transaction, rolled back if either fails, so readers never see the table half-written. With `false`, a failure can leave the table emptied or partly filled. |
@@ -275,8 +280,8 @@ await db.RestoreDatabaseAsync(@"D:\Backups\YourDatabase.bak");
 ```
 
 - Both act on the database named in the connection string. The path is a path on the SQL Server machine, not on the machine running your code, and the server's service account needs access to it.
-- `BackupDatabase` runs `BACKUP DATABASE [db] TO DISK = 'path'` with no options, so a second backup to the same file is appended to it.
-- `RestoreDatabase` runs `USE master; RESTORE DATABASE [db] FROM DISK = 'path'` with no options (no `REPLACE`, no `MOVE`). It fails if any other connection is using the database, and idle pooled connections from this process count.
+- `BackupDatabase` runs `BACKUP DATABASE @database TO DISK = @path` with no options, the name and path sent as parameters, so a second backup to the same file is appended to it.
+- `RestoreDatabase` switches its connection to `master`, then runs `RESTORE DATABASE @database FROM DISK = @path` with no options (no `REPLACE`, no `MOVE`). It fails if any other connection is using the database, and idle pooled connections from this process count: call `SqlConnection.ClearAllPools()` first.
 - `GetLastBackupDateTime` returns the latest `backup_finish_date` in `msdb.dbo.backupset` for the current database, or null if there is none. It needs read access to msdb.
 
 ---
@@ -286,10 +291,10 @@ await db.RestoreDatabaseAsync(@"D:\Backups\YourDatabase.bak");
 | Method | Returns |
 |---|---|
 | `DoesDatabaseExist(databaseName)` | `true` if a database of that name exists on the server, ignoring case. |
-| `DoesTableExist(tableName)` | `true` if any schema has a table or view with that name (`INFORMATION_SCHEMA.TABLES`). |
+| `DoesTableExist(tableName)` | `true` if a table or view with that name exists (`INFORMATION_SCHEMA.TABLES`). |
 | `GetTableNames()` | The names of all tables and views in the database, without schema names. |
-| `GetColumnNames(tableName)` | The column names of every table or view with that name, in any schema. |
-| `GetTableColumns(tableName)` | Column name to data type name (`int`, `nvarchar`, ...), from `INFORMATION_SCHEMA.COLUMNS`. |
+| `GetColumnNames(tableName)` | The column names of every table or view with that name. |
+| `GetTableColumns(tableName)` | Column name to data type name (`int`, `nvarchar`, ...), from `INFORMATION_SCHEMA.COLUMNS`, in column order. |
 | `GetTableSchema(tableName)` | An empty `DataTable` with the table's columns, types and key, from `SqlDataAdapter.FillSchema`. |
 | `GetTablePrimaryKeyColumn(tableName)` | The name of one primary key column, or null. For a composite key, only one of its columns. |
 | `GetTableIndexs(tableName)` | The names of the table's non-clustered indexes that are not the primary key. Clustered indexes are not listed. |
@@ -298,33 +303,26 @@ await db.RestoreDatabaseAsync(@"D:\Backups\YourDatabase.bak");
 | `GetStoredProcedureParameters(storedProcedureName)` | The procedure's parameter names, with their `@`, from `SqlCommandBuilder.DeriveParameters`. The return value is left out. |
 | `GetDatabaseInformation()` | A dictionary with `DatabaseName`, `DatabaseId`, `CreationDate` (formatted with the current culture) and `Collation`. |
 | `GetDatabaseSizeInBytes()` | The total size of the database's data and log files **in kilobytes**, despite the name (`SUM(size) * 8` from `sys.master_files`, where `size` counts 8 KB pages). Needs permission to read `sys.master_files`. |
-| `IndexCreate(tableName, columnName)` | Nothing. Runs `CREATE INDEX IX_<column> ON <table> (<column>)`. |
-| `IndexDrop(tableName, indexName)` | Nothing. Runs `DROP INDEX <index> ON <table>`. |
+| `IndexCreate(tableName, columnName)` | Nothing. Runs `CREATE INDEX [IX_<column>] ON <table> ([<column>])`. |
+| `IndexDrop(tableName, indexName)` | Nothing. Runs `DROP INDEX [<index>] ON <table>`. |
 
-Table names may include the schema (`dbo.Orders`) for `GetTableSchema`, `GetTableRowCount`, `GetTableIndexs`, `IndexCreate` and `IndexDrop`, which paste the name into SQL. `DoesTableExist`, `GetColumnNames`, `GetTableColumns` and `GetTablePrimaryKeyColumn` compare it with the bare table name, so pass `Orders`, not `dbo.Orders`.
+Every table name takes the forms described under "Inserting, updating and deleting": one to three parts, plain or bracketed. `GetTableSchema`, `GetTableRowCount`, `IndexCreate` and `IndexDrop` quote it into the SQL, and `GetTableIndexs` passes the quoted name to `OBJECT_ID` as a parameter, so a bare name there means the default schema. `DoesTableExist`, `GetColumnNames`, `GetTableColumns` and `GetTablePrimaryKeyColumn` compare the parts with the catalog as parameters: a bare name (`Orders`) matches a table of that name in any schema, and `dbo.Orders` matches only the one in `dbo`.
 
 ---
 
-## Methods that build SQL from your strings
+## Methods that run your SQL
 
-These methods put caller strings into SQL text without parameters. Treat every string listed here as code.
+These methods run SQL text you write. Treat every string listed here as code: build it in your own code, and send anything else as a parameter.
 
-| Method (and its async version) | Strings pasted into SQL |
+| Method (and its async version) | SQL run as written |
 |---|---|
-| `ExecuteQuery`, `ExecuteQuery<T>`, `ExecuteScalar<T>`, `ExecuteSQL`, `ExecuteTransaction`, `ExportDataToCSVAsync`, `ExecuteScriptFromFileAsync` (file contents) | the SQL itself, by design |
-| `InsertData` | table name, dictionary keys |
-| `InsertData<T>` | table name (column names come from the type) |
-| `UpdateData` | table name, dictionary keys, condition |
-| `DeleteData` | table name, condition |
-| `BulkCopy` | table name and `flushWhereClauseCondition` in the `DELETE`; the table name also goes to `SqlBulkCopy` |
-| `BackupDatabase`, `RestoreDatabase` | backup file path, inside `'...'` |
-| `DoesTableExist`, `GetTableColumns`, `GetTablePrimaryKeyColumn`, `GetTableIndexs` | table name, inside `'...'` |
-| `GetTableRowCount`, `GetTableSchema` | table name |
-| `IndexCreate` | table name, column name |
-| `IndexDrop` | table name, index name |
+| `ExecuteQuery`, `ExecuteQuery<T>`, `ExecuteScalar<T>`, `ExecuteSQL`, `ExecuteTransaction`, `ExportDataToCSVAsync`, `ExecuteScriptFromFileAsync` (file contents) | the SQL itself |
+| `ExecuteNonQueryWithParameters`, `ExecuteParameterizedQuery`, `ExecuteQueryToObjectList<T>` | the SQL itself; values go as parameters |
+| `UpdateData`, `DeleteData` | the condition; its values can go in the parameters dictionary |
+| `BulkCopy` | `flushWhereClauseCondition`; its values can go in `flushParameters` |
 | `QueryBuilder` (every method) | every string |
 
-`ExecuteNonQueryWithParameters`, `ExecuteParameterizedQuery`, `ExecuteStoredProcedure` and `ExecuteQueryToObjectList<T>` send values as parameters but still run the SQL text or procedure name you give them. `DoesDatabaseExist`, `GetColumnNames`, `GetTableNames`, `GetStoredProcedures` and `GetStoredProcedureParameters` pass names to SqlClient as parameters.
+`ExecuteStoredProcedure` and `GetStoredProcedureParameters` send the procedure name to SqlClient as a procedure name (`CommandType.StoredProcedure`), not as a batch. Every other name the library takes, of a table, column, index or database, is quoted or sent as a parameter.
 
 ---
 
