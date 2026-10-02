@@ -5,7 +5,7 @@ namespace SQLServerInteraction
     public partial class SQLServerInstance
     {
         /// <summary>
-        /// Executes a SQL query and returns the first column of every row, converted to <typeparamref name="T"/> with Convert.ChangeType.
+        /// Executes a SQL query and returns the first column of every row, converted to <typeparamref name="T"/> with Convert.ChangeType. A nullable type such as <c>int?</c> converts to its underlying type, and NULL gives null.
         /// </summary>
         /// <typeparam name="T">The type of objects to retrieve from the query results.</typeparam>
         /// <param name="sql">The SQL query to execute.</param>
@@ -23,7 +23,7 @@ namespace SQLServerInteraction
             while (reader.Read())
             {
                 var result = reader[0];
-                results.Add((T)Convert.ChangeType(result, typeof(T)));
+                results.Add(ValueConversion.ChangeQueryValue<T>(result));
             }
 
             return results;

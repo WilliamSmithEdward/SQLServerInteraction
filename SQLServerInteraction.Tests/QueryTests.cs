@@ -45,6 +45,17 @@ namespace SQLServerInteraction.Tests
         }
 
         [Fact]
+        public async Task ExecuteQuery_of_a_nullable_type_converts_and_gives_null_for_NULL()
+        {
+            string table = CreateOrders();
+
+            Assert.Equal([1L, 2L, null], Db.ExecuteQuery<long?>($"SELECT CASE WHEN Customer IS NULL THEN NULL ELSE OrderId END FROM dbo.{table} ORDER BY OrderId"));
+            Assert.Equal([19.99m, 5.00m, 7.50m], await Db.ExecuteQueryAsync<decimal?>($"SELECT Total FROM dbo.{table} ORDER BY OrderId"));
+            Assert.Equal(["Contoso", "Fabrikam", ""], Db.ExecuteQuery<string>($"SELECT Customer FROM dbo.{table} ORDER BY OrderId"));
+            Assert.Throws<InvalidCastException>(() => Db.ExecuteQuery<int>($"SELECT CAST(NULL AS int)"));
+        }
+
+        [Fact]
         public async Task ExecuteScalar_converts_the_first_value_and_gives_default_for_no_rows()
         {
             string table = CreateOrders();

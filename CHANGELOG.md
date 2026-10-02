@@ -30,7 +30,7 @@ Table, column, index and database names are now quoted as identifiers, and backu
 
 * `BackupDatabase` and `RestoreDatabase` send the database name and the path as parameters, so a database name with `]` or a path with `'` works. `RestoreDatabase` switches its connection to `master` before restoring.
 * The table lookups send the name as parameters instead of placing it between quotes in the SQL.
-* `ExecuteScalar<T>` with a nullable type such as `int?` converts the value instead of throwing.
+* `ExecuteScalar<T>`, `ExecuteQuery<T>` and their async versions, with a nullable type such as `int?`, convert the value instead of throwing, and give null for NULL.
 * Every method that takes a parameter dictionary adds the `@` only when a name lacks it; `ExecuteNonQueryWithParameters` used to turn `@Name` into `@@Name`.
 * A null value in a parameter or values dictionary is sent as SQL NULL in `InsertData`, `UpdateData` and `ExecuteNonQueryWithParameters`, instead of being dropped.
 * `GetTablePrimaryKeyColumn` returns the first key column in key order instead of an arbitrary one.
