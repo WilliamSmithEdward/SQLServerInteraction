@@ -8,7 +8,7 @@ namespace SQLServerInteraction
         /// Inserts data into a SQL Server table synchronously using a dictionary of column names and corresponding values.
         /// </summary>
         /// <param name="sqlServerTableName">The name of the table, such as <c>Sales</c>, <c>dbo.Sales</c> or <c>[dbo].[My Sales]</c>. It is quoted as an identifier.</param>
-        /// <param name="values">Column names and the values to insert. Each key is one column name, plain or bracketed (<c>My Field</c> or <c>[My Field]</c>), and is quoted as an identifier; the values are sent as parameters. Pass DBNull.Value, not null, for NULL.</param>
+        /// <param name="values">Column names and the values to insert. Each key is one column name, plain or bracketed (<c>My Field</c> or <c>[My Field]</c>), and is quoted as an identifier; the values are sent as parameters. Null is sent as NULL.</param>
         /// <exception cref="ArgumentException">A table or column name is not a valid name, or there are no values.</exception>
         public void InsertData(string sqlServerTableName, Dictionary<string, object> values)
         {
@@ -42,13 +42,13 @@ namespace SQLServerInteraction
             return columns;
         }
 
-        /// <summary>The values for <see cref="InsertSql"/> and <see cref="UpdateSql"/>, in the order of their columns.</summary>
-        private static void AddValueParameters(SqlCommand command, IEnumerable<object> values)
+        /// <summary>The values for <see cref="InsertSql"/> and <see cref="UpdateSql"/>, in the order of their columns, with null sent as NULL.</summary>
+        private static void AddValueParameters(SqlCommand command, IEnumerable<object?> values)
         {
             int i = 0;
             foreach (var value in values)
             {
-                command.Parameters.AddWithValue(CommandParameters.ValuePrefix + i++, value);
+                command.Parameters.AddWithValue(CommandParameters.ValuePrefix + i++, CommandParameters.Value(value));
             }
         }
     }

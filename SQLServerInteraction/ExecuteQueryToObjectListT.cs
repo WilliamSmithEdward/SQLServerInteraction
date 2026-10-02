@@ -20,14 +20,7 @@ namespace SQLServerInteraction
 
             using var command = new SqlCommand(sql, connection);
 
-            // Add parameters to prevent SQL injection
-            if (parameters != null)
-            {
-                foreach (var param in parameters)
-                {
-                    command.Parameters.AddWithValue(param.Key, param.Value ?? DBNull.Value);
-                }
-            }
+            CommandParameters.Add(command, parameters);
 
             using var reader = command.ExecuteReader();
 
