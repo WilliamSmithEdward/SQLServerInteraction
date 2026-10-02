@@ -21,13 +21,7 @@ namespace SQLServerInteraction
 
                 using var command = new SqlCommand(sql, connection);
 
-                if (parameters != null)
-                {
-                    foreach (var param in parameters)
-                    {
-                        command.Parameters.AddWithValue(param.Key, param.Value ?? DBNull.Value);
-                    }
-                }
+                CommandParameters.Add(command, parameters);
 
                 using var reader = await command.ExecuteReaderAsync();
 

@@ -7,7 +7,7 @@ namespace SQLServerInteraction
         /// <summary>
         /// Executes a SQL query and returns the result as a single value of type T.
         /// </summary>
-        /// <typeparam name="T">The type of the expected result.</typeparam>
+        /// <typeparam name="T">The type of the expected result. A nullable type such as <c>int?</c> works: the value is converted to its underlying type.</typeparam>
         /// <param name="sql">The SQL query to execute.</param>
         /// <returns>The result of the query as a single value of type T, or the default value of T if the result is null or DBNull.Value.</returns>
         public T? ExecuteScalar<T>(string sql)
@@ -19,7 +19,7 @@ namespace SQLServerInteraction
 
             var result = command.ExecuteScalar();
 
-            return result != null && result != DBNull.Value ? (T)Convert.ChangeType(result, typeof(T)) : default;
+            return ValueConversion.ChangeType<T>(result);
         }
     }
 }

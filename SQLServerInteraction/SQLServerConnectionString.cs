@@ -1,4 +1,6 @@
-﻿namespace SQLServerInteraction
+﻿using Microsoft.Data.SqlClient;
+
+namespace SQLServerInteraction
 {
     /// <summary>
     /// Represents a configuration for constructing a SQL Server connection string.
@@ -31,7 +33,7 @@
         public bool Encrypt { get; set; } = true;
 
         /// <summary>
-        /// Gets or sets additional parameters to include in the connection string.
+        /// Gets or sets additional connection string keywords, such as <c>"TrustServerCertificate=True"</c>, merged into the connection string.
         /// </summary>
         public string AdditionalParameters { get; set; }
 
@@ -43,7 +45,7 @@
         /// <param name="userId">The SQL Server login name.</param>
         /// <param name="password">The password for <paramref name="userId"/>.</param>
         /// <param name="encrypt">Whether to add <c>Encrypt=True</c> (the default) or <c>Encrypt=False</c>.</param>
-        /// <param name="additionalParameters">Text appended to the end of the connection string as written, such as <c>"TrustServerCertificate=True;"</c>.</param>
+        /// <param name="additionalParameters">Other connection string keywords, such as <c>"TrustServerCertificate=True"</c>. They are parsed and merged, not appended as text, and replace any keyword the other arguments set; see <see cref="GetConnectionString"/>.</param>
         public SQLServerConnectionString(string serverName, string databaseName, string? userId, string? password, bool encrypt = true, string additionalParameters = "")
         {
             Server = serverName;
@@ -60,7 +62,7 @@
         /// <param name="serverName">The SQL Server host or instance name.</param>
         /// <param name="databaseName">The name of the database to connect to.</param>
         /// <param name="encrypt">Whether to add <c>Encrypt=True</c> (the default) or <c>Encrypt=False</c>.</param>
-        /// <param name="additionalParameters">Text appended to the end of the connection string as written, such as <c>"TrustServerCertificate=True;"</c>.</param>
+        /// <param name="additionalParameters">Other connection string keywords, such as <c>"TrustServerCertificate=True"</c>. They are parsed and merged, not appended as text, and replace any keyword the other arguments set; see <see cref="GetConnectionString"/>.</param>
         public SQLServerConnectionString(string serverName, string databaseName, bool encrypt = true, string additionalParameters = "")
         {
             Server = serverName;
@@ -72,22 +74,50 @@
         /// <summary>
         /// Constructs and returns a connection string for connecting to a SQL Server database.
         /// </summary>
-        /// <returns>The constructed connection string.</returns>
+        /// <returns>The connection string, built with <see cref="SqlConnectionStringBuilder"/>, so a value containing <c>;</c> or a quote is escaped.</returns>
         /// <remarks>
-        /// Values are inserted as written, without validation or escaping, so a value containing <c>;</c> breaks the string.
+        /// <see cref="AdditionalParameters"/> is parsed with <see cref="SqlConnectionStringBuilder"/> and merged with the other properties,
+        /// each of its keywords replacing any the properties set, as it did when 1.x appended it to the end of the string.
         /// </remarks>
+        /// <exception cref="ArgumentException"><see cref="AdditionalParameters"/> is not a valid connection string.</exception>
         public string GetConnectionString()
         {
-            string encryptPart = Encrypt ? "Encrypt=True;" : "Encrypt=False;";
+            var additional = new SqlConnectionStringBuilder();
+
+            if (!string.IsNullOrWhiteSpace(AdditionalParameters))
+            {
+                try
+                {
+                    additional.ConnectionString = AdditionalParameters;
+                }
+                catch (Exception e) when (e is ArgumentException or FormatException or InvalidOperationException or KeyNotFoundException)
+                {
+                    throw new ArgumentException($"The additional parameters are not a valid connection string: {e.Message}", nameof(AdditionalParameters), e);
+                }
+            }
+
+            var builder = new SqlConnectionStringBuilder();
+            builder.DataSource = Server;
+            builder.InitialCatalog = DatabaseName;
 
             if (string.IsNullOrEmpty(UserId))
             {
-                return $"Server={Server};Database={DatabaseName};Trusted_Connection=True;{encryptPart};" + AdditionalParameters;
+                builder.IntegratedSecurity = true;
             }
             else
             {
-                return $"Server={Server};Database={DatabaseName};User Id={UserId};Password={Password};{encryptPart};" + AdditionalParameters;
+                builder.UserID = UserId;
+                builder.Password = Password ?? "";
             }
+
+            builder.Encrypt = Encrypt ? SqlConnectionEncryptOption.Mandatory : SqlConnectionEncryptOption.Optional;
+
+            foreach (string keyword in additional.Keys)
+            {
+                if (additional.ShouldSerialize(keyword)) builder[keyword] = additional[keyword];
+            }
+
+            return builder.ConnectionString;
         }
     }
 }

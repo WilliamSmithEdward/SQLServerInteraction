@@ -25,16 +25,16 @@ Pass a connection string, or build one with `SQLServerConnectionString`:
 ```csharp
 using SQLServerInteraction;
 
-// Windows authentication (Trusted_Connection=True)
+// Windows authentication (Integrated Security)
 var trusted = new SQLServerConnectionString("your-server", "YourDatabase");
 Console.WriteLine(trusted.GetConnectionString());
-// Server=your-server;Database=YourDatabase;Trusted_Connection=True;Encrypt=True;;
+// Data Source=your-server;Initial Catalog=YourDatabase;Integrated Security=True;Encrypt=True
 
 // SQL Server authentication, encryption off, one extra keyword
 var login = new SQLServerConnectionString("your-server", "YourDatabase", "your-user", "your-password",
     encrypt: false, additionalParameters: "TrustServerCertificate=True;");
 Console.WriteLine(login.GetConnectionString());
-// Server=your-server;Database=YourDatabase;User Id=your-user;Password=your-password;Encrypt=False;;TrustServerCertificate=True;
+// Data Source=your-server;Initial Catalog=YourDatabase;User ID=your-user;Password=your-password;Encrypt=False;Trust Server Certificate=True
 
 var db = new SQLServerInstance(trusted);
 var db2 = new SQLServerInstance("Server=your-server;Database=YourDatabase;Trusted_Connection=True;Encrypt=True;");
@@ -42,11 +42,10 @@ var db2 = new SQLServerInstance("Server=your-server;Database=YourDatabase;Truste
 
 How `GetConnectionString()` builds the string:
 
+- It uses SqlClient's `SqlConnectionStringBuilder`, so a value containing `;`, `=` or a quote, such as a password, is quoted and reaches the server as written.
 - `Encrypt` defaults to `true`.
-- A null or empty `UserId` gives `Trusted_Connection=True`, and the password is ignored. Otherwise the string carries `User Id` and `Password`.
-- `additionalParameters` is appended at the end as written, so end each keyword with `;`.
-- Nothing is validated or escaped. A value containing `;`, such as a password, breaks the string: SqlClient then throws `ArgumentException` when the connection string is parsed. Use `SqlConnectionStringBuilder` and the string constructor of `SQLServerInstance` for such values.
-- The empty `;;` after `Encrypt` is harmless; SqlClient skips it.
+- A null or empty `UserId` gives `Integrated Security=True`, and the password is ignored. Otherwise the string carries `User ID` and `Password`.
+- `additionalParameters` is parsed as a connection string and merged in. Each of its keywords replaces the one the other arguments set, as it did when 1.x appended it to the end, so `"Encrypt=Strict"` there gives strict encryption. Text that is not a valid connection string, or an unknown keyword, throws `ArgumentException`.
 
 Constructing a `SQLServerInstance` does not connect. Each method call opens its own `SqlConnection` and disposes it before returning, so connection pooling is whatever the connection string sets (SqlClient pools by default). Commands use SqlClient's default 30-second command timeout; apart from `BulkCopy`, no method takes a timeout or a `CancellationToken`.
 
@@ -78,7 +77,7 @@ decimal total = await db.ExecuteScalarAsync<decimal>("SELECT SUM(Total) FROM dbo
 ```
 
 - `ExecuteQuery<T>` and `ExecuteQueryAsync<T>` read only the first column and convert each value with `Convert.ChangeType`. A NULL becomes `""` for `string` and throws `InvalidCastException` for a value type.
-- `ExecuteScalar<T>` and `ExecuteScalarAsync<T>` return `default(T)` when the query returns no rows or a NULL, and otherwise convert the value with `Convert.ChangeType`. That conversion cannot target a nullable type, so `ExecuteScalar<int?>` throws `InvalidCastException` whenever the value is not NULL. Ask for `int` and expect `0` for no rows or NULL.
+- `ExecuteScalar<T>` and `ExecuteScalarAsync<T>` return `default(T)` when the query returns no rows or a NULL, and otherwise convert the value with `Convert.ChangeType`. A nullable type converts to its underlying type, so `ExecuteScalar<int?>` returns the number, or null for no rows or NULL.
 - None of these four take parameters. To filter on a value, use `ExecuteQueryToObjectList<T>` below, which does.
 
 ### Mapping rows to objects
@@ -130,7 +129,7 @@ var db = new SQLServerInstance(new SQLServerConnectionString("your-server", "You
 db.ExecuteSQL("UPDATE dbo.Orders SET Archived = 1 WHERE OrderDate < '2020-01-01'");
 await db.ExecuteSQLAsync("EXEC dbo.RefreshTotals");
 
-// Dictionary keys are parameter names WITHOUT the @
+// Dictionary keys are parameter names, with or without the @
 db.ExecuteNonQueryWithParameters(
     "UPDATE dbo.Orders SET Status = @Status WHERE OrderId = @OrderId",
     new Dictionary<string, object> { ["Status"] = "Shipped", ["OrderId"] = 42 });
@@ -146,8 +145,8 @@ db.ExecuteStoredProcedure("dbo.RebuildIndexes");
 ```
 
 - None of these return the number of rows affected or any result set; use `ExecuteQuery` or `ExecuteScalar<T>` to read data back. `ExecuteParameterizedQuery` runs a command, not a query, despite its name.
-- `ExecuteNonQueryWithParameters` adds `@` to each key, so a key that already starts with `@` becomes `@@name` and the command fails.
-- A null dictionary value is not sent as NULL: SqlClient omits the parameter and the server reports it missing. Pass `DBNull.Value` instead.
+- Every method that takes a parameter dictionary names the parameters the same way: the `@` is added only when the key lacks it, so `"Status"` and `"@Status"` are both `@Status`.
+- A null dictionary value is sent as SQL NULL, as `DBNull.Value` is.
 - The `SqlParameter` methods use the array you pass; a `SqlParameter` can belong to only one command, so build new ones for each call.
 
 ### Transactions
@@ -208,10 +207,10 @@ await db.InsertDataAsync(new Customer { CustomerId = 8, Name = "Fabrikam" }, "db
 
 - Table names can have one, two or three parts (`Customers`, `dbo.Customers`, `MyDb.dbo.Customers`), each plain or in brackets (`[dbo].[My Customers]`). Every part is quoted, so a name with a space or any other character works and cannot change the SQL. A malformed name (an empty part, an unclosed bracket, more than three parts, a part over 128 characters) throws `ArgumentException`.
 - Each dictionary key is one column name, plain or bracketed (`Customer Name` or `[Customer Name]`), and is quoted the same way. Bracket a column name that contains a dot. The values are sent as parameters named `@__value_0`, `@__value_1` and so on, so do not give condition parameters those names.
-- A null value is not sent as NULL (see above); use `DBNull.Value`.
+- A null value is sent as NULL, as `DBNull.Value` is.
 - `UpdateData` and `DeleteData` take the condition as SQL text without the `WHERE` keyword, run as written. An overload of each (and of the async versions) takes a dictionary of parameters for the condition as its last argument. Parameter names work with or without the `@`, and null is sent as NULL.
 - The condition is required. An empty or whitespace condition throws `ArgumentException` instead of affecting every row; to update or delete every row, pass `"1 = 1"`.
-- `InsertData<T>` and `InsertDataAsync<T>` insert one row with a column for every public property of `T`, named exactly as the property. They ignore `SQLServerInstance.Column`, so the example above writes to a column called `Name`. A null property value is sent as NULL. Include only properties that have columns; an identity column fails unless `IDENTITY_INSERT` is on.
+- `InsertData<T>` and `InsertDataAsync<T>` insert one row with a column for every public instance property of `T` that has a getter, named by its `SQLServerInstance.Column` attribute or else by the property, so the example above writes to `Customer Name`. Static properties and indexers are left out. A null property value is sent as NULL. Include only properties that have columns; an identity column fails unless `IDENTITY_INSERT` is on.
 - None of these return the number of rows affected.
 
 ### Bulk copy
@@ -296,17 +295,18 @@ await db.RestoreDatabaseAsync(@"D:\Backups\YourDatabase.bak");
 | `GetColumnNames(tableName)` | The column names of every table or view with that name. |
 | `GetTableColumns(tableName)` | Column name to data type name (`int`, `nvarchar`, ...), from `INFORMATION_SCHEMA.COLUMNS`, in column order. |
 | `GetTableSchema(tableName)` | An empty `DataTable` with the table's columns, types and key, from `SqlDataAdapter.FillSchema`. |
-| `GetTablePrimaryKeyColumn(tableName)` | The name of one primary key column, or null. For a composite key, only one of its columns. |
+| `GetTablePrimaryKeyColumn(tableName)` | The first column of the primary key in key order, or null. For a composite key, only that one. |
+| `GetTablePrimaryKeyColumns(tableName)` | Every column of the primary key, in key order, or an empty list. |
 | `GetTableIndexs(tableName)` | The names of the table's non-clustered indexes that are not the primary key. Clustered indexes are not listed. |
 | `GetTableRowCount(tableName)` | `SELECT COUNT(*)` for the table, as an `int`. |
 | `GetStoredProcedures()` | The names of all stored procedures and functions (`INFORMATION_SCHEMA.ROUTINES`), without schema names. |
 | `GetStoredProcedureParameters(storedProcedureName)` | The procedure's parameter names, with their `@`, from `SqlCommandBuilder.DeriveParameters`. The return value is left out. |
 | `GetDatabaseInformation()` | A dictionary with `DatabaseName`, `DatabaseId`, `CreationDate` (formatted with the current culture) and `Collation`. |
-| `GetDatabaseSizeInBytes()` | The total size of the database's data and log files **in kilobytes**, despite the name (`SUM(size) * 8` from `sys.master_files`, where `size` counts 8 KB pages). Needs permission to read `sys.master_files`. |
+| `GetDatabaseSizeInBytes()` | The total size of the database's data and log files in bytes (`SUM(size) * 8192` from `sys.master_files`, where `size` counts 8 KB pages). Before 2.0.0 it returned kilobytes. Needs permission to read `sys.master_files`. |
 | `IndexCreate(tableName, columnName)` | Nothing. Runs `CREATE INDEX [IX_<column>] ON <table> ([<column>])`. |
 | `IndexDrop(tableName, indexName)` | Nothing. Runs `DROP INDEX [<index>] ON <table>`. |
 
-Every table name takes the forms described under "Inserting, updating and deleting": one to three parts, plain or bracketed. `GetTableSchema`, `GetTableRowCount`, `IndexCreate` and `IndexDrop` quote it into the SQL, and `GetTableIndexs` passes the quoted name to `OBJECT_ID` as a parameter, so a bare name there means the default schema. `DoesTableExist`, `GetColumnNames`, `GetTableColumns` and `GetTablePrimaryKeyColumn` compare the parts with the catalog as parameters: a bare name (`Orders`) matches a table of that name in any schema, and `dbo.Orders` matches only the one in `dbo`.
+Every table name takes the forms described under "Inserting, updating and deleting": one to three parts, plain or bracketed. `GetTableSchema`, `GetTableRowCount`, `IndexCreate` and `IndexDrop` quote it into the SQL, and `GetTableIndexs` passes the quoted name to `OBJECT_ID` as a parameter, so a bare name there means the default schema. `DoesTableExist`, `GetColumnNames`, `GetTableColumns`, `GetTablePrimaryKeyColumn` and `GetTablePrimaryKeyColumns` compare the parts with the catalog as parameters: a bare name (`Orders`) matches a table of that name in any schema, and `dbo.Orders` matches only the one in `dbo`.
 
 ---
 

@@ -8,7 +8,7 @@ namespace SQLServerInteraction
         /// Executes a non-query SQL command with parameters.
         /// </summary>
         /// <param name="sql">The SQL command to execute.</param>
-        /// <param name="parameters">A dictionary of parameters to be added to the SQL command. Keys are parameter names without the @, which is added. Pass DBNull.Value, not null, for NULL.</param>
+        /// <param name="parameters">A dictionary of parameters to be added to the SQL command. Names work with or without the @, and null is sent as NULL.</param>
         public void ExecuteNonQueryWithParameters(string sql, Dictionary<string, object> parameters)
         {
             using var connection = new SqlConnection(_connectionString);
@@ -16,10 +16,7 @@ namespace SQLServerInteraction
 
             using var command = new SqlCommand(sql, connection);
 
-            foreach (var kvp in parameters)
-            {
-                command.Parameters.AddWithValue("@" + kvp.Key, kvp.Value);
-            }
+            CommandParameters.Add(command, parameters);
 
             command.ExecuteNonQuery();
         }
