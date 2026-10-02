@@ -1,4 +1,4 @@
-﻿namespace SQLServerInteraction.Tests
+namespace SQLServerInteraction.Tests
 {
     /// <summary>
     /// A test class that needs the test SQL Server. Each of its tests is

@@ -1,4 +1,4 @@
-﻿namespace SQLServerInteraction.Tests
+namespace SQLServerInteraction.Tests
 {
     /// <summary>
     /// Behaviour that was wrong before 2.0.0, on a real server.

@@ -1,4 +1,4 @@
-﻿namespace SQLServerInteraction.Tests
+namespace SQLServerInteraction.Tests
 {
     /// <summary>
     /// QueryBuilder output that was wrong before 2.0.0, and output that worked and must not change.
