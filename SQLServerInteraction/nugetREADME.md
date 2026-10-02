@@ -237,9 +237,18 @@ await db.BulkCopyAsync(table, "dbo.Orders",
     flushParameters: new Dictionary<string, object> { ["From"] = new DateTime(2026, 1, 1) },
     bulkCopyTimeout: 120,
     batchSize: 5000);
+
+// Copy by name: DataTable column -> destination column. Unmapped columns are not copied.
+var source = new DataTable();
+source.Columns.Add("Code", typeof(int));
+source.Columns.Add("Amount", typeof(decimal));
+source.Rows.Add(3, 12.50m);
+
+db.BulkCopy(source, "dbo.Orders", flushTable: false, flushWhereClauseCondition: null, flushParameters: null,
+    columnMappings: new Dictionary<string, string> { ["Code"] = "OrderId", ["Amount"] = "Total" });
 ```
 
-`BulkCopy` and `BulkCopyAsync` write the rows with `SqlBulkCopy`. Columns map by position, not by name, so the DataTable's columns must be in the destination table's order. The table name is quoted as described above, for the `DELETE` and for `SqlBulkCopy`.
+`BulkCopy` and `BulkCopyAsync` write the rows with `SqlBulkCopy`. Without `columnMappings`, columns map by position, not by name, so the DataTable's columns must be in the destination table's order. The table name is quoted as described above, for the `DELETE` and for `SqlBulkCopy`.
 
 | Parameter | Default | Effect |
 |---|---|---|
@@ -249,6 +258,7 @@ await db.BulkCopyAsync(table, "dbo.Orders",
 | `bulkCopyTimeout` | `30` | Seconds the copy may take before it fails. |
 | `batchSize` | `null` | Rows per batch sent to the server. `null` sends all rows in one batch. |
 | `useTransaction` | `true` | Run the delete and the copy in one transaction, rolled back if either fails, so readers never see the table half-written. With `false`, a failure can leave the table emptied or partly filled. |
+| `columnMappings` | `null` | Taken by the same overload as `flushParameters`, as its last argument. Each key is a DataTable column, matched without regard to case, and its value the destination column it is copied to; only mapped columns are copied, and the others in the destination get their defaults. A destination is a column name, not SQL, matched exactly, case included; brackets around it (`[Sales Region]`) are removed first, and a name with a space needs none. An empty dictionary, a key the DataTable does not have, or an empty destination throws `ArgumentException` before anything is deleted. A destination the table does not have fails when the copy runs, after the flush, which the transaction rolls back. `null` maps by position. |
 
 ---
 
