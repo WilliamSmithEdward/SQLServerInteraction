@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using Microsoft.Data.SqlClient;
 
 namespace SQLServerInteraction.Tests
@@ -68,17 +68,46 @@ namespace SQLServerInteraction.Tests
         }
 
         [Fact]
-        public void A_hostile_column_name_is_a_name()
+        public async Task A_hostile_column_name_is_a_name()
         {
             string victim = CreateVictim();
             string column = $"c]] = 1; DROP TABLE {victim}; --";
             string table = Database.CreateTable($"Id int NOT NULL, [{column}] int NULL");
 
             Db.InsertData(table, new Dictionary<string, object> { ["Id"] = 1, [$"[{column}]"] = 5 });
+            await Db.InsertDataAsync(table, new Dictionary<string, object> { ["Id"] = 2, [$"[{column}]"] = 7 });
             Db.UpdateData(table, new Dictionary<string, object> { [$"[{column}]"] = 6 }, "Id = 1");
 
-            Assert.Equal(6, Database.Scalar($"SELECT [{column}] FROM dbo.{table}"));
+            Assert.Equal(6, Database.Scalar($"SELECT [{column}] FROM dbo.{table} WHERE Id = 1"));
+            Assert.Equal(7, Database.Scalar($"SELECT [{column}] FROM dbo.{table} WHERE Id = 2"));
             Assert.True(Exists(victim));
+        }
+
+        /// <summary>The victim a ColumnAttribute names, which must be a constant.</summary>
+        private const string ColumnAttributeVictim = "VictimOfInsertDataOfT";
+
+        public class HostileRow
+        {
+            public int Id { get; set; }
+
+            [SQLServerInstance.Column("v]; DROP TABLE " + ColumnAttributeVictim + "; --")]
+            public string? Value { get; set; }
+        }
+
+        [Fact]
+        public async Task InsertData_of_T_reads_hostile_table_and_column_names_as_names()
+        {
+            Database.Execute($"CREATE TABLE dbo.{ColumnAttributeVictim} (Id int NOT NULL)");
+            string victim = CreateVictim();
+            string table = Database.CreateTable(
+                $"Id int NOT NULL, [v]]; DROP TABLE {ColumnAttributeVictim}; --] nvarchar(50) NULL", $"x]; DROP TABLE {victim}; --");
+
+            Db.InsertData(new HostileRow { Id = 1, Value = "a" }, table);
+            await Db.InsertDataAsync(new HostileRow { Id = 2, Value = "b" }, "dbo." + SqlIdentifier.QuotePart(table));
+
+            Assert.Equal(2, Db.GetTableRowCount(table));
+            Assert.True(Exists(victim));
+            Assert.True(Exists(ColumnAttributeVictim));
         }
 
         [Fact]

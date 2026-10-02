@@ -1,4 +1,4 @@
-namespace SQLServerInteraction.Tests
+﻿namespace SQLServerInteraction.Tests
 {
     public class SqlIdentifierTests
     {

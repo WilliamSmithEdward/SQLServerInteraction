@@ -1,4 +1,4 @@
-namespace SQLServerInteraction.Tests
+﻿namespace SQLServerInteraction.Tests
 {
     /// <summary>
     /// SQL from QueryBuilder runs on a real server, with the values AddParameter recorded.
