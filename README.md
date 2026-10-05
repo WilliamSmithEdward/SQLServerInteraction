@@ -5,7 +5,7 @@
 [![CI](https://github.com/WilliamSmithEdward/SQLServerInteraction/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/WilliamSmithEdward/SQLServerInteraction/actions/workflows/ci.yml)
 [![Security](https://github.com/WilliamSmithEdward/SQLServerInteraction/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/WilliamSmithEdward/SQLServerInteraction/actions/workflows/security.yml)
 [![Malware scan](https://github.com/WilliamSmithEdward/SQLServerInteraction/actions/workflows/malware-scan.yml/badge.svg?branch=main)](https://github.com/WilliamSmithEdward/SQLServerInteraction/actions/workflows/malware-scan.yml)
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/WilliamSmithEdward/SQLServerInteraction/badge)](https://scorecard.dev/viewer/?uri=github.com/WilliamSmithEdward/SQLServerInteraction)
+[![OpenSSF Scorecard](https://img.shields.io/ossf-scorecard/github.com/WilliamSmithEdward/SQLServerInteraction)](https://scorecard.dev/viewer/?uri=github.com/WilliamSmithEdward/SQLServerInteraction)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](https://github.com/WilliamSmithEdward/SQLServerInteraction/blob/main/LICENSE)
 
 SQLServerInteraction is a thin layer over Microsoft.Data.SqlClient for .NET 9. A `SQLServerInstance` holds a connection string, and each of its methods opens a connection, runs one piece of work (a query, a command, a bulk copy, a backup, a schema lookup) and closes the connection again. A separate `QueryBuilder` assembles SELECT statements from strings.

@@ -87,13 +87,15 @@ jobs:
         run: |
           set -- dist/*.nupkg
           [ "$#" -eq 1 ] && [ "$1" = "dist/SQLServerInteraction.$VERSION.nupkg" ] || { echo "want dist/SQLServerInteraction.$VERSION.nupkg alone, found: $*"; exit 1; }
+          unzip -p "$1" README.md > packaged-readme.md
+          cmp README.md packaged-readme.md
           unzip -Z1 "$1" > contents.txt
           cat contents.txt
           for ext in dll xml; do
             want="lib/net9.0/SQLServerInteraction.$ext"
             grep -qxF "$want" contents.txt || { echo "missing from the package: $want"; exit 1; }
           done
-          for want in nugetREADME.md SQLServerInteraction.png; do
+          for want in README.md SQLServerInteraction.png; do
             grep -qxF "$want" contents.txt || { echo "missing from the package: $want"; exit 1; }
           done
 

@@ -58,11 +58,10 @@ for net9.0. What an agent working here must not break:
 - **Public signatures.** Callers compile against them: add an overload or a
   method instead of a parameter on an existing public method, even an
   optional one.
-- **Two READMEs that say the same things.** `README.md` is the GitHub page and
-  `SQLServerInteraction/nugetREADME.md` is packed as the nuget.org readme.
-  Change both in the same pull request. They differ only in the badge block,
-  which `nugetREADME.md` leaves out because nuget.org does not render images
-  from api.scorecard.dev. Links in both are absolute.
+- **One README for GitHub and NuGet.** The root `README.md` is packed
+  directly as the nuget.org readme. Keep links and image URLs absolute,
+  use NuGet-supported image hosts, and serve the Scorecard badge through
+  `img.shields.io`. Do not add a separate package README.
 - **The lock files.** Restores run with `--locked-mode` against
   `SQLServerInteraction/packages.lock.json` and
   `SQLServerInteraction.Tests/packages.lock.json`. A changed package reference
