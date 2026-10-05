@@ -2,16 +2,16 @@
 
   <PropertyGroup>
 	<Deterministic>false</Deterministic>
-	<AssemblyVersion>2.0.0</AssemblyVersion>
-	<PackageVersion>2.0.0</PackageVersion>
+	<AssemblyVersion>2.0.1</AssemblyVersion>
+	<PackageVersion>2.0.1</PackageVersion>
   </PropertyGroup>
 
   <PropertyGroup>
-	<PackageReadmeFile>nugetREADME.md</PackageReadmeFile>
+	<PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <ItemGroup>
-	<None Include="nugetREADME.md" Pack="true" PackagePath="\">
+	<None Include="../README.md" Pack="true" PackagePath="\">
 	  <CopyToOutputDirectory>Always</CopyToOutputDirectory>
 	</None>
   </ItemGroup>
