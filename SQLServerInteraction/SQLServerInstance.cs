@@ -4,7 +4,9 @@ using System.Data;
 namespace SQLServerInteraction
 {
     /// <summary>
-    /// Represents a SQL Server instance with a connection string.
+    /// Represents a SQL Server instance with a connection string. Each method opens a
+    /// connection, does one piece of work and closes it; <see cref="BeginTransactionAsync(CancellationToken)"/>
+    /// gives an object that runs several of them in one transaction.
     /// </summary>
     public partial class SQLServerInstance
     {
@@ -29,50 +31,24 @@ namespace SQLServerInteraction
         }
 
         /// <summary>
-        /// Opens a connection and begins a transaction on it, with SqlClient's default isolation level (read committed). The data methods of the returned object run in that transaction until <see cref="SQLServerTransaction.Commit"/>; disposing it without a commit rolls back.
-        /// </summary>
-        /// <returns>The transaction, which owns the connection.</returns>
-        public SQLServerTransaction BeginTransaction() => BeginTransaction(IsolationLevel.Unspecified);
-
-        /// <summary>
-        /// Opens a connection and begins a transaction on it with the given isolation level. The data methods of the returned object run in that transaction until <see cref="SQLServerTransaction.Commit"/>; disposing it without a commit rolls back.
-        /// </summary>
-        /// <param name="isolationLevel">The transaction's isolation level. <see cref="IsolationLevel.Unspecified"/> takes SqlClient's default, read committed.</param>
-        /// <returns>The transaction, which owns the connection.</returns>
-        public SQLServerTransaction BeginTransaction(IsolationLevel isolationLevel)
-        {
-            var connection = new SqlConnection(_connectionString);
-            try
-            {
-                connection.Open();
-                return new SQLServerTransaction(connection, connection.BeginTransaction(isolationLevel));
-            }
-            catch
-            {
-                connection.Dispose();
-                throw;
-            }
-        }
-
-        /// <summary>
-        /// Asynchronously opens a connection and begins a transaction on it, with SqlClient's default isolation level (read committed). The data methods of the returned object run in that transaction until <see cref="SQLServerTransaction.CommitAsync"/>; disposing it without a commit rolls back.
+        /// Opens a connection and begins a transaction on it, with SqlClient's default isolation level (read committed). The data methods of the returned object run in that transaction until <see cref="SQLServerTransaction.CommitAsync"/>; disposing it without a commit rolls back.
         /// </summary>
         /// <param name="cancellationToken">A token to cancel opening the connection and beginning the transaction.</param>
         /// <returns>A task whose result is the transaction, which owns the connection.</returns>
-        public Task<SQLServerTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default) => BeginTransactionAsync(IsolationLevel.Unspecified, cancellationToken);
+        public Task<SQLServerTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default) =>
+            BeginTransactionAsync(IsolationLevel.Unspecified, cancellationToken);
 
         /// <summary>
-        /// Asynchronously opens a connection and begins a transaction on it with the given isolation level. The data methods of the returned object run in that transaction until <see cref="SQLServerTransaction.CommitAsync"/>; disposing it without a commit rolls back.
+        /// Opens a connection and begins a transaction on it with the given isolation level. The data methods of the returned object run in that transaction until <see cref="SQLServerTransaction.CommitAsync"/>; disposing it without a commit rolls back.
         /// </summary>
         /// <param name="isolationLevel">The transaction's isolation level. <see cref="IsolationLevel.Unspecified"/> takes SqlClient's default, read committed.</param>
         /// <param name="cancellationToken">A token to cancel opening the connection and beginning the transaction.</param>
         /// <returns>A task whose result is the transaction, which owns the connection.</returns>
         public async Task<SQLServerTransaction> BeginTransactionAsync(IsolationLevel isolationLevel, CancellationToken cancellationToken = default)
         {
-            var connection = new SqlConnection(_connectionString);
+            var connection = await OpenAsync(cancellationToken);
             try
             {
-                await connection.OpenAsync(cancellationToken);
                 return new SQLServerTransaction(connection, (SqlTransaction)await connection.BeginTransactionAsync(isolationLevel, cancellationToken));
             }
             catch
@@ -82,39 +58,63 @@ namespace SQLServerInteraction
             }
         }
 
-        /// <summary>
-        /// An open connection in autocommit, wrapped so that one call can run on it
-        /// the same way it runs in a transaction. Disposing it closes the connection.
-        /// </summary>
-        private SQLServerTransaction Connect()
+        /// <summary>A new connection, open, or disposed again if opening it failed.</summary>
+        private async Task<SqlConnection> OpenAsync(CancellationToken cancellationToken)
         {
             var connection = new SqlConnection(_connectionString);
             try
             {
-                connection.Open();
-                return new SQLServerTransaction(connection, null);
-            }
-            catch
-            {
-                connection.Dispose();
-                throw;
-            }
-        }
-
-        /// <inheritdoc cref="Connect"/>
-        private async Task<SQLServerTransaction> ConnectAsync()
-        {
-            var connection = new SqlConnection(_connectionString);
-            try
-            {
-                await connection.OpenAsync();
-                return new SQLServerTransaction(connection, null);
+                await connection.OpenAsync(cancellationToken);
+                return connection;
             }
             catch
             {
                 await connection.DisposeAsync();
                 throw;
             }
+        }
+
+        /// <summary>
+        /// Runs one piece of work on a connection of its own, in autocommit, through the
+        /// same implementation that serves a transaction. The connection closes afterwards.
+        /// </summary>
+        private async Task<T> RunAsync<T>(Func<SQLServerTransaction, Task<T>> work, CancellationToken cancellationToken)
+        {
+            await using var autocommit = new SQLServerTransaction(await OpenAsync(cancellationToken), null);
+            return await work(autocommit);
+        }
+
+        /// <inheritdoc cref="RunAsync{T}(Func{SQLServerTransaction, Task{T}}, CancellationToken)"/>
+        private Task RunAsync(Func<SQLServerTransaction, Task> work, CancellationToken cancellationToken) =>
+            RunAsync(async autocommit => { await work(autocommit); return true; }, cancellationToken);
+
+        /// <summary>
+        /// Runs one piece of work in a transaction of its own, committed when the work
+        /// returns and rolled back when it throws, or in autocommit when
+        /// <paramref name="useTransaction"/> is false.
+        /// </summary>
+        private async Task<T> RunAsync<T>(bool useTransaction, Func<SQLServerTransaction, Task<T>> work, CancellationToken cancellationToken)
+        {
+            if (!useTransaction) return await RunAsync(work, cancellationToken);
+
+            await using var transaction = await BeginTransactionAsync(cancellationToken);
+            T result = await work(transaction);
+            await transaction.CommitAsync(cancellationToken);
+            return result;
+        }
+
+        /// <inheritdoc cref="RunAsync{T}(bool, Func{SQLServerTransaction, Task{T}}, CancellationToken)"/>
+        private Task RunAsync(bool useTransaction, Func<SQLServerTransaction, Task> work, CancellationToken cancellationToken) =>
+            RunAsync(useTransaction, async transaction => { await work(transaction); return true; }, cancellationToken);
+
+        /// <summary>
+        /// Runs one piece of work that needs the bare connection, such as a schema
+        /// lookup, and closes the connection afterwards.
+        /// </summary>
+        private async Task<T> WithConnectionAsync<T>(Func<SqlConnection, Task<T>> work, CancellationToken cancellationToken)
+        {
+            await using var connection = await OpenAsync(cancellationToken);
+            return await work(connection);
         }
 
         /// <summary>

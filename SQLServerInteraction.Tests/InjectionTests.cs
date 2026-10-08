@@ -27,26 +27,26 @@ namespace SQLServerInteraction.Tests
         {
             var (hostile, victim) = CreateHostileTable();
 
-            Db.InsertData(hostile, new Dictionary<string, object> { ["Id"] = 1, ["Customer Name"] = "Contoso" });
+            await Db.InsertDataAsync(hostile, new Dictionary<string, object> { ["Id"] = 1, ["Customer Name"] = "Contoso" });
             await Db.InsertDataAsync("dbo." + SqlIdentifier.QuotePart(hostile), new Dictionary<string, object> { ["Id"] = 2, ["[Customer Name]"] = "Fabrikam" });
-            Db.UpdateData(hostile, new Dictionary<string, object> { ["Customer Name"] = "Contoso Ltd" }, "Id = 1");
+            await Db.UpdateDataAsync(hostile, new Dictionary<string, object> { ["Customer Name"] = "Contoso Ltd" }, "Id = 1");
             await Db.UpdateDataAsync(hostile, new Dictionary<string, object> { ["Customer Name"] = "Fabrikam Ltd" }, "Id = 2");
 
-            Assert.True(Db.DoesTableExist(hostile));
-            Assert.Equal(2, Db.GetTableRowCount(hostile));
-            Assert.Equal(["Id", "Customer Name"], Db.GetTableSchema(hostile).Columns.Cast<DataColumn>().Select(c => c.ColumnName));
-            Assert.Equal(["Id", "Customer Name"], Db.GetTableColumns(hostile).Keys);
-            Assert.Equal(["Id", "Customer Name"], Db.GetColumnNames(hostile));
-            Assert.Equal("Id", Db.GetTablePrimaryKeyColumn(hostile));
+            Assert.True(await Db.DoesTableExistAsync(hostile));
+            Assert.Equal(2, await Db.GetTableRowCountAsync(hostile));
+            Assert.Equal(["Id", "Customer Name"], (await Db.GetTableSchemaAsync(hostile)).Columns.Cast<DataColumn>().Select(c => c.ColumnName));
+            Assert.Equal(["Id", "Customer Name"], (await Db.GetTableColumnsAsync(hostile)).Keys);
+            Assert.Equal(["Id", "Customer Name"], await Db.GetColumnNamesAsync(hostile));
+            Assert.Equal("Id", await Db.GetTablePrimaryKeyColumnAsync(hostile));
 
-            Db.IndexCreate(hostile, "Customer Name");
-            Assert.Equal(["IX_Customer Name"], Db.GetTableIndexs(hostile));
-            Db.IndexDrop(hostile, "IX_Customer Name");
-            Assert.Empty(Db.GetTableIndexs(hostile));
+            await Db.IndexCreateAsync(hostile, "Customer Name");
+            Assert.Equal(["IX_Customer Name"], await Db.GetTableIndexesAsync(hostile));
+            await Db.IndexDropAsync(hostile, "IX_Customer Name");
+            Assert.Empty(await Db.GetTableIndexesAsync(hostile));
 
-            Db.DeleteData(hostile, "Id = 1");
+            await Db.DeleteDataAsync(hostile, "Id = 1");
             await Db.DeleteDataAsync(hostile, "Id = 2");
-            Assert.Equal(0, Db.GetTableRowCount(hostile));
+            Assert.Equal(0, await Db.GetTableRowCountAsync(hostile));
 
             Assert.True(Exists(victim));
         }
@@ -60,10 +60,10 @@ namespace SQLServerInteraction.Tests
             rows.Columns.Add("Customer Name", typeof(string));
             rows.Rows.Add(1, "Contoso");
 
-            Db.BulkCopy(rows, hostile, flushTable: true);
+            await Db.BulkCopyAsync(rows, hostile, flushTable: true);
             await Db.BulkCopyAsync(rows, hostile, flushTable: true, flushWhereClauseCondition: "Id = @Id", flushParameters: new Dictionary<string, object> { ["Id"] = 1 });
 
-            Assert.Equal(1, Db.GetTableRowCount(hostile));
+            Assert.Equal(1, await Db.GetTableRowCountAsync(hostile));
             Assert.True(Exists(victim));
         }
 
@@ -74,9 +74,9 @@ namespace SQLServerInteraction.Tests
             string column = $"c]] = 1; DROP TABLE {victim}; --";
             string table = Database.CreateTable($"Id int NOT NULL, [{column}] int NULL");
 
-            Db.InsertData(table, new Dictionary<string, object> { ["Id"] = 1, [$"[{column}]"] = 5 });
+            await Db.InsertDataAsync(table, new Dictionary<string, object> { ["Id"] = 1, [$"[{column}]"] = 5 });
             await Db.InsertDataAsync(table, new Dictionary<string, object> { ["Id"] = 2, [$"[{column}]"] = 7 });
-            Db.UpdateData(table, new Dictionary<string, object> { [$"[{column}]"] = 6 }, "Id = 1");
+            await Db.UpdateDataAsync(table, new Dictionary<string, object> { [$"[{column}]"] = 6 }, "Id = 1");
 
             Assert.Equal(6, Database.Scalar($"SELECT [{column}] FROM dbo.{table} WHERE Id = 1"));
             Assert.Equal(7, Database.Scalar($"SELECT [{column}] FROM dbo.{table} WHERE Id = 2"));
@@ -98,12 +98,12 @@ namespace SQLServerInteraction.Tests
             rows.Columns.Add(column, typeof(string));
             rows.Rows.Add(3, "Northwind");
 
-            Assert.Equal(2, Db.MergeData(source, target, ["Id"], [quotedColumn]));
+            Assert.Equal(2, await Db.MergeDataAsync(source, target, ["Id"], [quotedColumn]));
             Assert.Equal(3, await Db.MergeDataAsync("dbo." + SqlIdentifier.QuotePart(source), target, ["[Id]"], [quotedColumn], deleteUnmatched: true));
-            Assert.Equal(1, Db.BulkMerge(rows, target, ["Id"]));
+            Assert.Equal(1, await Db.BulkMergeAsync(rows, target, ["Id"]));
             Assert.Equal(3, await Db.BulkMergeAsync(rows, "dbo." + SqlIdentifier.QuotePart(target), [quotedColumn], deleteUnmatched: true));
 
-            Assert.Equal(1, Db.GetTableRowCount(target));
+            Assert.Equal(1, await Db.GetTableRowCountAsync(target));
             Assert.Equal("Northwind", Database.Scalar($"SELECT {quotedColumn} FROM dbo.{SqlIdentifier.QuotePart(target)} WHERE Id = 3"));
             Assert.True(Exists(victim));
         }
@@ -127,28 +127,28 @@ namespace SQLServerInteraction.Tests
             string table = Database.CreateTable(
                 $"Id int NOT NULL, [v]]; DROP TABLE {ColumnAttributeVictim}; --] nvarchar(50) NULL", $"x]; DROP TABLE {victim}; --");
 
-            Db.InsertData(new HostileRow { Id = 1, Value = "a" }, table);
+            await Db.InsertDataAsync(new HostileRow { Id = 1, Value = "a" }, table);
             await Db.InsertDataAsync(new HostileRow { Id = 2, Value = "b" }, "dbo." + SqlIdentifier.QuotePart(table));
 
-            Assert.Equal(2, Db.GetTableRowCount(table));
+            Assert.Equal(2, await Db.GetTableRowCountAsync(table));
             Assert.True(Exists(victim));
             Assert.True(Exists(ColumnAttributeVictim));
         }
 
         [Fact]
-        public void A_quote_in_a_looked_up_name_does_not_end_the_string()
+        public async Task A_quote_in_a_looked_up_name_does_not_end_the_string()
         {
             CreateVictim();
 
             // Before 2.0.0 this became TABLE_NAME = 'x' OR 1 = 1 --', true in any database with a table.
-            Assert.False(Db.DoesTableExist("x' OR 1 = 1 --"));
-            Assert.Empty(Db.GetTableColumns("x' OR 1 = 1 --"));
-            Assert.Null(Db.GetTablePrimaryKeyColumn("x' OR 1 = 1 --"));
-            Assert.Empty(Db.GetTableIndexs("x') OR 1 = 1 --"));
+            Assert.False(await Db.DoesTableExistAsync("x' OR 1 = 1 --"));
+            Assert.Empty(await Db.GetTableColumnsAsync("x' OR 1 = 1 --"));
+            Assert.Null(await Db.GetTablePrimaryKeyColumnAsync("x' OR 1 = 1 --"));
+            Assert.Empty(await Db.GetTableIndexesAsync("x') OR 1 = 1 --"));
         }
 
         [Fact]
-        public void A_schema_qualified_name_matches_that_schema_only()
+        public async Task A_schema_qualified_name_matches_that_schema_only()
         {
             string schema = "Sales Ops " + Guid.NewGuid().ToString("N")[..8];
             string table = "T_" + Guid.NewGuid().ToString("N");
@@ -157,14 +157,14 @@ namespace SQLServerInteraction.Tests
             Database.Execute($"CREATE TABLE dbo.{table} (Id int NOT NULL PRIMARY KEY)");
             string qualified = $"[{schema}].{table}";
 
-            Assert.True(Db.DoesTableExist(qualified));
-            Assert.True(Db.DoesTableExist($"{Database.DatabaseName}.dbo.{table}"));
-            Assert.False(Db.DoesTableExist($"guest.{table}"));
-            Assert.Equal(["Code", "Label"], Db.GetTableColumns(qualified).Keys);
-            Assert.Equal(["Code", "Label"], Db.GetColumnNames(qualified));
-            Assert.Equal(["Id"], Db.GetColumnNames("dbo." + table));
-            Assert.Equal("Code", Db.GetTablePrimaryKeyColumn(qualified));
-            Assert.Equal("Id", Db.GetTablePrimaryKeyColumn("[dbo]." + table));
+            Assert.True(await Db.DoesTableExistAsync(qualified));
+            Assert.True(await Db.DoesTableExistAsync($"{Database.DatabaseName}.dbo.{table}"));
+            Assert.False(await Db.DoesTableExistAsync($"guest.{table}"));
+            Assert.Equal(["Code", "Label"], (await Db.GetTableColumnsAsync(qualified)).Keys);
+            Assert.Equal(["Code", "Label"], await Db.GetColumnNamesAsync(qualified));
+            Assert.Equal(["Id"], await Db.GetColumnNamesAsync("dbo." + table));
+            Assert.Equal("Code", await Db.GetTablePrimaryKeyColumnAsync(qualified));
+            Assert.Equal("Id", await Db.GetTablePrimaryKeyColumnAsync("[dbo]." + table));
         }
 
         [Fact]
@@ -173,11 +173,11 @@ namespace SQLServerInteraction.Tests
             string table = Database.CreateTable("Id int NOT NULL, Name nvarchar(50) NULL");
             Database.Execute($"INSERT INTO dbo.{table} VALUES (1, N'O''Brien'), (2, N'Smith'), (3, NULL)");
 
-            Db.UpdateData(table, new Dictionary<string, object> { ["Id"] = 10 }, "Name = @name", new Dictionary<string, object> { ["name"] = "O'Brien" });
+            await Db.UpdateDataAsync(table, new Dictionary<string, object> { ["Id"] = 10 }, "Name = @name", new Dictionary<string, object> { ["name"] = "O'Brien" });
             await Db.UpdateDataAsync(table, new Dictionary<string, object> { ["Id"] = 20 }, "Name = @name", new Dictionary<string, object> { ["@name"] = "Smith" });
             Assert.Equal(2, Database.Scalar($"SELECT COUNT(*) FROM dbo.{table} WHERE Id IN (10, 20)"));
 
-            Db.DeleteData(table, "Id = @id", new Dictionary<string, object> { ["id"] = 10 });
+            await Db.DeleteDataAsync(table, "Id = @id", new Dictionary<string, object> { ["id"] = 10 });
             await Db.DeleteDataAsync(table, "Name IS NULL OR Name = @name", new Dictionary<string, object> { ["name"] = null! });
             Assert.Equal(1, Database.Scalar($"SELECT COUNT(*) FROM dbo.{table}"));
         }
@@ -190,28 +190,28 @@ namespace SQLServerInteraction.Tests
             var rows = new DataTable();
             rows.Columns.Add("Id", typeof(int));
 
-            Assert.Throws<ArgumentException>(() => Db.DeleteData(table, ""));
+            await Assert.ThrowsAsync<ArgumentException>(() => Db.DeleteDataAsync(table, ""));
             await Assert.ThrowsAsync<ArgumentException>(() => Db.DeleteDataAsync(table, "  "));
-            Assert.Throws<ArgumentException>(() => Db.UpdateData(table, new Dictionary<string, object> { ["Id"] = 0 }, ""));
+            await Assert.ThrowsAsync<ArgumentException>(() => Db.UpdateDataAsync(table, new Dictionary<string, object> { ["Id"] = 0 }, ""));
             await Assert.ThrowsAsync<ArgumentException>(() => Db.UpdateDataAsync(table, new Dictionary<string, object> { ["Id"] = 0 }, "\t"));
-            Assert.Throws<ArgumentException>(() => Db.BulkCopy(rows, table, flushTable: true, flushWhereClauseCondition: ""));
+            await Assert.ThrowsAsync<ArgumentException>(() => Db.BulkCopyAsync(rows, table, flushTable: true, flushWhereClauseCondition: ""));
             await Assert.ThrowsAsync<ArgumentException>(() => Db.BulkCopyAsync(rows, table, flushTable: true, flushWhereClauseCondition: " "));
             Assert.Equal(2, Database.Scalar($"SELECT COUNT(*) FROM dbo.{table} WHERE Id IN (1, 2)"));
 
-            Db.DeleteData(table, "1 = 1");
+            await Db.DeleteDataAsync(table, "1 = 1");
             Assert.Equal(0, Database.Scalar($"SELECT COUNT(*) FROM dbo.{table}"));
         }
 
         [Fact]
-        public void A_malformed_name_is_refused_before_anything_runs()
+        public async Task A_malformed_name_is_refused_before_anything_runs()
         {
             string table = Database.CreateTable("Id int NOT NULL");
 
-            Assert.Throws<ArgumentException>(() => Db.InsertData("[" + table, new Dictionary<string, object> { ["Id"] = 1 }));
-            Assert.Throws<ArgumentException>(() => Db.InsertData(table, new Dictionary<string, object> { ["a.b"] = 1 }));
-            Assert.Throws<ArgumentException>(() => Db.InsertData(table, new Dictionary<string, object>()));
-            Assert.Throws<ArgumentException>(() => Db.GetTableRowCount("a.b.c.d"));
-            Assert.Throws<ArgumentException>(() => Db.DoesTableExist(""));
+            await Assert.ThrowsAsync<ArgumentException>(() => Db.InsertDataAsync("[" + table, new Dictionary<string, object> { ["Id"] = 1 }));
+            await Assert.ThrowsAsync<ArgumentException>(() => Db.InsertDataAsync(table, new Dictionary<string, object> { ["a.b"] = 1 }));
+            await Assert.ThrowsAsync<ArgumentException>(() => Db.InsertDataAsync(table, new Dictionary<string, object>()));
+            await Assert.ThrowsAsync<ArgumentException>(() => Db.GetTableRowCountAsync("a.b.c.d"));
+            await Assert.ThrowsAsync<ArgumentException>(() => Db.DoesTableExistAsync(""));
             Assert.Equal(0, Database.Scalar($"SELECT COUNT(*) FROM dbo.{table}"));
         }
     }

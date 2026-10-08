@@ -28,11 +28,11 @@ namespace SQLServerInteraction.Tests
         private int Count(string table) => (int)Database.Scalar($"SELECT COUNT(*) FROM dbo.{table}")!;
 
         [Fact]
-        public void Mapped_columns_are_copied_by_name_whatever_their_order()
+        public async Task Mapped_columns_are_copied_by_name_whatever_their_order()
         {
             string table = CreateCustomers();
 
-            Db.BulkCopy(Source(), table, flushTable: false, flushWhereClauseCondition: null, flushParameters: null,
+            await Db.BulkCopyAsync(Source(), table, flushTable: false, flushWhereClauseCondition: null, flushParameters: null,
                 columnMappings: new Dictionary<string, string> { ["Code"] = "Id", ["CustomerName"] = "Name", ["Region"] = "Sales Region" });
 
             Assert.Equal(2, Count(table));
@@ -55,35 +55,35 @@ namespace SQLServerInteraction.Tests
         }
 
         [Fact]
-        public void A_bracketed_destination_loses_its_brackets_and_a_source_matches_without_regard_to_case()
+        public async Task A_bracketed_destination_loses_its_brackets_and_a_source_matches_without_regard_to_case()
         {
             string table = CreateCustomers();
 
-            Db.BulkCopy(Source(), table, flushTable: false, flushWhereClauseCondition: null, flushParameters: null,
+            await Db.BulkCopyAsync(Source(), table, flushTable: false, flushWhereClauseCondition: null, flushParameters: null,
                 columnMappings: new Dictionary<string, string> { ["code"] = "Id", ["REGION"] = "[Sales Region]" });
 
             Assert.Equal("East", Value(table, "Sales Region", 2));
         }
 
         [Fact]
-        public void A_destination_must_match_the_column_name_in_case_and_a_mismatch_rolls_back_the_flush()
+        public async Task A_destination_must_match_the_column_name_in_case_and_a_mismatch_rolls_back_the_flush()
         {
             string table = CreateCustomers();
             Database.Execute($"INSERT INTO dbo.{table} (Id) VALUES (99)");
 
-            Assert.Throws<InvalidOperationException>(() => Db.BulkCopy(Source(), table, flushTable: true, flushWhereClauseCondition: null, flushParameters: null,
+            await Assert.ThrowsAsync<InvalidOperationException>(() => Db.BulkCopyAsync(Source(), table, flushTable: true, flushWhereClauseCondition: null, flushParameters: null,
                 columnMappings: new Dictionary<string, string> { ["Code"] = "ID" }));
 
             Assert.Equal(1, Count(table));
         }
 
         [Fact]
-        public void A_destination_the_table_does_not_have_fails_on_the_server_and_rolls_back_the_flush()
+        public async Task A_destination_the_table_does_not_have_fails_on_the_server_and_rolls_back_the_flush()
         {
             string table = CreateCustomers();
             Database.Execute($"INSERT INTO dbo.{table} (Id) VALUES (99)");
 
-            Assert.ThrowsAny<InvalidOperationException>(() => Db.BulkCopy(Source(), table, flushTable: true, flushWhereClauseCondition: null, flushParameters: null,
+            await Assert.ThrowsAnyAsync<InvalidOperationException>(() => Db.BulkCopyAsync(Source(), table, flushTable: true, flushWhereClauseCondition: null, flushParameters: null,
                 columnMappings: new Dictionary<string, string> { ["Code"] = "NoSuchColumn" }));
 
             Assert.Equal(1, Count(table));
@@ -104,7 +104,7 @@ namespace SQLServerInteraction.Tests
             string table = CreateCustomers();
             Database.Execute($"INSERT INTO dbo.{table} (Id) VALUES (99)");
 
-            Assert.Throws<ArgumentException>(() => Db.BulkCopy(Source(), table, true, null, null, columnMappings: mappings));
+            await Assert.ThrowsAsync<ArgumentException>(() => Db.BulkCopyAsync(Source(), table, true, null, null, columnMappings: mappings));
             await Assert.ThrowsAsync<ArgumentException>(() => Db.BulkCopyAsync(Source(), table, true, null, null, columnMappings: mappings));
 
             Assert.True(Count(table) == 1, reason);

@@ -449,7 +449,7 @@ namespace SQLServerInteraction
 
         /// <summary>
         /// Gets or sets the parameters recorded with <see cref="QueryBuilder.AddParameter"/>, by name with the @, null values as DBNull.Value.
-        /// Pass it with <see cref="SQL"/> to a method that takes a parameter dictionary, such as <see cref="SQLServerInstance.ExecuteQueryToObjectList{T}"/>.
+        /// Pass it with <see cref="SQL"/> to a method that takes a parameter dictionary, such as <see cref="SQLServerInstance.ExecuteQueryToObjectListAsync{T}(string, Dictionary{string, object}?, CancellationToken)"/>.
         /// </summary>
         public Dictionary<string, object> ParameterValues { get; set; } = [];
     }

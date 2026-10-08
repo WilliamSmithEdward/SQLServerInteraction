@@ -50,7 +50,7 @@ namespace SQLServerInteraction.Tests
         }
 
         [Fact]
-        public void A_subquery_runs_with_its_parameters()
+        public async Task A_subquery_runs_with_its_parameters()
         {
             string orders = Database.CreateTable("Id int NOT NULL, CustomerId int NOT NULL");
             string customers = Database.CreateTable("CustomerId int NOT NULL, Region nvarchar(10) NOT NULL");
@@ -69,7 +69,7 @@ namespace SQLServerInteraction.Tests
 
             QueryBuildResult result = builder.Build();
 
-            Assert.Equal([10, 12], Db.ExecuteQueryToObjectList<IdRow>(result.SQL!, result.ParameterValues).Select(r => r.Id));
+            Assert.Equal([10, 12], (await Db.ExecuteQueryToObjectListAsync<IdRow>(result.SQL!, result.ParameterValues)).Select(r => r.Id));
         }
 
         public class IdRow

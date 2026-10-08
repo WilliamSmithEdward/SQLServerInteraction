@@ -11,16 +11,22 @@ unlisted on nuget.org.
 
 ## [3.0.0] - 2026-10-08
 
-A merge operation, a bulk copy that merges, and a transaction object on which the data methods run together. No existing public signature or behavior changes; the major version marks the size of the new surface. `AGENT_PRIMER.md` describes the whole library and every breaking change since 1.x.
+The library is async only, every method takes a cancellation token, and there is a merge operation, a bulk copy that merges, and a transaction object on which the data methods run together. `AGENT_PRIMER.md` describes the whole library and every breaking change since 1.x.
+
+### Breaking changes
+
+* Every synchronous method is removed. Each server-facing method exists only as `...Async`, and the methods that had no async form, the schema lookups, `GetLastBackupDateTime`, `IndexCreate` and `IndexDrop`, are `...Async` now. To upgrade, append `Async` to the name and `await` the call. `QueryBuilder` and `SQLServerConnectionString` are unchanged.
+* Every method takes an optional `CancellationToken` as its last parameter. Existing calls compile unchanged, but assemblies built against 1.x or 2.x must be recompiled: the parameter changes the methods' signatures, so a DLL swapped under built code fails with `MissingMethodException`.
+* `GetTableIndexs` is renamed `GetTableIndexesAsync`.
 
 ### Additions
 
-* `MergeData` and `MergeDataAsync` merge one table into another with a `MERGE` statement: a target row whose key columns match a source row is updated, a source row with no match is inserted, and with `deleteUnmatched` a target row with no match is deleted. Every name is quoted as an identifier, and the method returns the number of rows affected.
-* `BulkMerge` and `BulkMergeAsync` bulk copy a DataTable into a temporary table and merge it into the destination in one transaction, matching columns by name. They take the same `deleteUnmatched`, a `timeout` for the copy and the merge, and `batchSize`.
-* All four take `useTransaction`, true by default, as `BulkCopy` does.
-* `BeginTransaction` and `BeginTransactionAsync` return a `SQLServerTransaction`: one connection and one transaction on which the queries, commands, inserts, updates, deletes, merges and bulk copies run together, with the same signatures as on `SQLServerInstance`. `Commit` commits; disposing without a commit rolls back. Each takes an optional `IsolationLevel`.
-* `ExecuteTransaction` and `ExecuteTransactionAsync` now run through that object. Their behavior is unchanged.
-* `SQLServerTransaction` also carries `IndexCreate` and `IndexDrop`, with async versions, and savepoints: `Save(name)` marks one and `RollbackTo(name)` undoes the work since it while the transaction stays open. Every async method on it, and `BeginTransactionAsync`, takes an optional `CancellationToken` as its last argument.
+* `MergeDataAsync` merges one table into another with a `MERGE` statement: a target row whose key columns match a source row is updated, a source row with no match is inserted, and with `deleteUnmatched` a target row with no match is deleted. Every name is quoted as an identifier, and the method returns the number of rows affected.
+* `BulkMergeAsync` bulk copies a DataTable into a temporary table and merges it into the destination in one transaction, matching columns by name. It takes the same `deleteUnmatched`, a `timeout` for the copy and the merge, and `batchSize`.
+* Both take `useTransaction`, true by default, as `BulkCopyAsync` does.
+* `BeginTransactionAsync` returns a `SQLServerTransaction`: one connection and one transaction on which the queries, commands, inserts, updates, deletes, merges and bulk copies run together, with the same signatures as on `SQLServerInstance`. `CommitAsync` commits; disposing without a commit rolls back. It takes an optional `IsolationLevel`.
+* `ExecuteTransactionAsync` now runs through that object. Its behavior is unchanged.
+* `SQLServerTransaction` also carries `IndexCreateAsync` and `IndexDropAsync`, and savepoints: `SaveAsync(name)` marks one and `RollbackToAsync(name)` undoes the work since it while the transaction stays open.
 
 ## [2.0.1] - 2026-10-04
 

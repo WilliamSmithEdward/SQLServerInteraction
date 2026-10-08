@@ -13,11 +13,11 @@ namespace SQLServerInteraction.Tests
         }
 
         [Fact]
-        public void ExecuteQuery_returns_every_row_and_column()
+        public async Task ExecuteQuery_returns_every_row_and_column()
         {
             string table = CreateOrders();
 
-            DataTable result = Db.ExecuteQuery($"SELECT OrderId, Customer, Total FROM dbo.{table} ORDER BY OrderId");
+            DataTable result = await Db.ExecuteQueryAsync($"SELECT OrderId, Customer, Total FROM dbo.{table} ORDER BY OrderId");
 
             Assert.Equal(3, result.Rows.Count);
             Assert.Equal(["OrderId", "Customer", "Total"], result.Columns.Cast<DataColumn>().Select(c => c.ColumnName));
@@ -40,7 +40,7 @@ namespace SQLServerInteraction.Tests
         {
             string table = CreateOrders();
 
-            Assert.Equal([1, 2, 3], Db.ExecuteQuery<int>($"SELECT OrderId, Total FROM dbo.{table} ORDER BY OrderId"));
+            Assert.Equal([1, 2, 3], await Db.ExecuteQueryAsync<int>($"SELECT OrderId, Total FROM dbo.{table} ORDER BY OrderId"));
             Assert.Equal([19.99m, 5.00m, 7.50m], await Db.ExecuteQueryAsync<decimal>($"SELECT Total FROM dbo.{table} ORDER BY OrderId"));
         }
 
@@ -49,10 +49,10 @@ namespace SQLServerInteraction.Tests
         {
             string table = CreateOrders();
 
-            Assert.Equal([1L, 2L, null], Db.ExecuteQuery<long?>($"SELECT CASE WHEN Customer IS NULL THEN NULL ELSE OrderId END FROM dbo.{table} ORDER BY OrderId"));
+            Assert.Equal([1L, 2L, null], await Db.ExecuteQueryAsync<long?>($"SELECT CASE WHEN Customer IS NULL THEN NULL ELSE OrderId END FROM dbo.{table} ORDER BY OrderId"));
             Assert.Equal([19.99m, 5.00m, 7.50m], await Db.ExecuteQueryAsync<decimal?>($"SELECT Total FROM dbo.{table} ORDER BY OrderId"));
-            Assert.Equal(["Contoso", "Fabrikam", ""], Db.ExecuteQuery<string>($"SELECT Customer FROM dbo.{table} ORDER BY OrderId"));
-            Assert.Throws<InvalidCastException>(() => Db.ExecuteQuery<int>($"SELECT CAST(NULL AS int)"));
+            Assert.Equal(["Contoso", "Fabrikam", ""], await Db.ExecuteQueryAsync<string>($"SELECT Customer FROM dbo.{table} ORDER BY OrderId"));
+            await Assert.ThrowsAsync<InvalidCastException>(() => Db.ExecuteQueryAsync<int>($"SELECT CAST(NULL AS int)"));
         }
 
         [Fact]
@@ -60,9 +60,9 @@ namespace SQLServerInteraction.Tests
         {
             string table = CreateOrders();
 
-            Assert.Equal(3, Db.ExecuteScalar<int>($"SELECT COUNT(*) FROM dbo.{table}"));
+            Assert.Equal(3, await Db.ExecuteScalarAsync<int>($"SELECT COUNT(*) FROM dbo.{table}"));
             Assert.Equal(32.49m, await Db.ExecuteScalarAsync<decimal>($"SELECT SUM(Total) FROM dbo.{table}"));
-            Assert.Equal(0, Db.ExecuteScalar<int>($"SELECT OrderId FROM dbo.{table} WHERE OrderId = 99"));
+            Assert.Equal(0, await Db.ExecuteScalarAsync<int>($"SELECT OrderId FROM dbo.{table} WHERE OrderId = 99"));
         }
 
         public class Order
@@ -81,7 +81,7 @@ namespace SQLServerInteraction.Tests
             string table = CreateOrders();
             string sql = $"SELECT OrderId, Customer, Total FROM dbo.{table} WHERE Total > @Min ORDER BY OrderId";
 
-            List<Order> orders = Db.ExecuteQueryToObjectList<Order>(sql, new Dictionary<string, object> { ["Min"] = 6m });
+            List<Order> orders = await Db.ExecuteQueryToObjectListAsync<Order>(sql, new Dictionary<string, object> { ["Min"] = 6m });
             List<Order> sameWithAt = await Db.ExecuteQueryToObjectListAsync<Order>(sql, new Dictionary<string, object> { ["@Min"] = 6m });
 
             Assert.Equal([1, 3], orders.Select(o => o.OrderId));
@@ -92,26 +92,26 @@ namespace SQLServerInteraction.Tests
         }
 
         [Fact]
-        public void ExecuteParameterizedQuery_sends_SqlParameters()
+        public async Task ExecuteParameterizedQuery_sends_SqlParameters()
         {
             string table = CreateOrders();
 
-            Db.ExecuteParameterizedQuery($"DELETE FROM dbo.{table} WHERE OrderId = @OrderId", [new SqlParameter("@OrderId", 2)]);
+            await Db.ExecuteParameterizedQueryAsync($"DELETE FROM dbo.{table} WHERE OrderId = @OrderId", [new SqlParameter("@OrderId", 2)]);
 
             Assert.Equal(2, Database.Scalar($"SELECT COUNT(*) FROM dbo.{table}"));
         }
 
         [Fact]
-        public void ExecuteTransaction_commits_all_or_rolls_back_all()
+        public async Task ExecuteTransaction_commits_all_or_rolls_back_all()
         {
             string table = CreateOrders();
 
-            Db.ExecuteTransaction([
+            await Db.ExecuteTransactionAsync([
                 $"UPDATE dbo.{table} SET Total = Total - 1 WHERE OrderId = 1",
                 $"UPDATE dbo.{table} SET Total = Total + 1 WHERE OrderId = 2",
             ]);
 
-            Assert.ThrowsAny<SqlException>(() => Db.ExecuteTransaction([
+            await Assert.ThrowsAnyAsync<SqlException>(() => Db.ExecuteTransactionAsync([
                 $"UPDATE dbo.{table} SET Total = 0 WHERE OrderId = 1",
                 $"INSERT INTO dbo.{table} VALUES (1, N'duplicate key', 0)",
             ]));

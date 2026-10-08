@@ -3,28 +3,14 @@ using System.Data;
 
 namespace SQLServerInteraction
 {
-    public partial class SQLServerInstance
-    {
-        /// <summary>
-        /// Asynchronously executes a SQL query and returns the results as a DataTable.
-        /// </summary>
-        /// <param name="sql">The SQL query to execute.</param>
-        /// <returns>A DataTable containing the results of the query.</returns>
-        public async Task<DataTable> ExecuteQueryAsync(string sql)
-        {
-            using var work = await ConnectAsync();
-            return await work.ExecuteQueryAsync(sql);
-        }
-    }
-
     public partial class SQLServerTransaction
     {
         /// <summary>
-        /// Asynchronously executes a SQL query and returns the results as a DataTable.
+        /// Executes a SQL query and returns the results as a DataTable.
         /// </summary>
         /// <param name="sql">The SQL query to execute.</param>
         /// <param name="cancellationToken">A token to cancel the operation.</param>
-        /// <returns>A DataTable containing the results of the query.</returns>
+        /// <returns>A task whose result is a DataTable containing the results of the query.</returns>
         public async Task<DataTable> ExecuteQueryAsync(string sql, CancellationToken cancellationToken = default)
         {
             var dataTable = new DataTable();
@@ -36,5 +22,12 @@ namespace SQLServerInteraction
 
             return dataTable;
         }
+    }
+
+    public partial class SQLServerInstance
+    {
+        /// <inheritdoc cref="SQLServerTransaction.ExecuteQueryAsync(string, CancellationToken)"/>
+        public Task<DataTable> ExecuteQueryAsync(string sql, CancellationToken cancellationToken = default) =>
+            RunAsync(work => work.ExecuteQueryAsync(sql, cancellationToken), cancellationToken);
     }
 }

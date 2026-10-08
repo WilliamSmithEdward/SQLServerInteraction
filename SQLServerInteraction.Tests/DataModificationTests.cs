@@ -16,7 +16,7 @@ namespace SQLServerInteraction.Tests
         {
             string table = CreateCustomers();
 
-            Db.InsertData("dbo." + table, new Dictionary<string, object> { ["CustomerId"] = 1, ["Name"] = "Contoso", ["Region"] = "West" });
+            await Db.InsertDataAsync("dbo." + table, new Dictionary<string, object> { ["CustomerId"] = 1, ["Name"] = "Contoso", ["Region"] = "West" });
             await Db.InsertDataAsync(table, new Dictionary<string, object> { ["CustomerId"] = 2, ["Name"] = "Fabrikam", ["Region"] = DBNull.Value });
 
             Assert.Equal("Contoso", Database.Scalar($"SELECT Name FROM dbo.{table} WHERE CustomerId = 1"));
@@ -37,7 +37,7 @@ namespace SQLServerInteraction.Tests
         {
             string table = CreateCustomers();
 
-            Db.InsertData(new Customer { CustomerId = 1, Name = "Contoso", Region = "West" }, "dbo." + table);
+            await Db.InsertDataAsync(new Customer { CustomerId = 1, Name = "Contoso", Region = "West" }, "dbo." + table);
             await Db.InsertDataAsync(new Customer { CustomerId = 2, Name = "Fabrikam" }, table);
 
             Assert.Equal("West", Database.Scalar($"SELECT Region FROM dbo.{table} WHERE CustomerId = 1"));
@@ -50,7 +50,7 @@ namespace SQLServerInteraction.Tests
             string table = CreateCustomers();
             Database.Execute($"INSERT INTO dbo.{table} VALUES (1, N'Contoso', N'West'), (2, N'Fabrikam', N'East')");
 
-            Db.UpdateData(table, new Dictionary<string, object> { ["Region"] = "North" }, "CustomerId = 1");
+            await Db.UpdateDataAsync(table, new Dictionary<string, object> { ["Region"] = "North" }, "CustomerId = 1");
             await Db.UpdateDataAsync("dbo." + table, new Dictionary<string, object> { ["Name"] = "Fabrikam Ltd" }, "CustomerId = 2");
 
             Assert.Equal("North", Database.Scalar($"SELECT Region FROM dbo.{table} WHERE CustomerId = 1"));
@@ -64,7 +64,7 @@ namespace SQLServerInteraction.Tests
             string table = CreateCustomers();
             Database.Execute($"INSERT INTO dbo.{table} VALUES (1, N'Contoso', N'West'), (2, N'Fabrikam', N'East'), (3, N'Northwind', N'East')");
 
-            Db.DeleteData(table, "CustomerId = 1");
+            await Db.DeleteDataAsync(table, "CustomerId = 1");
             await Db.DeleteDataAsync("dbo." + table, "Region = 'East' AND CustomerId = 2");
 
             Assert.Equal(1, Count(table));
@@ -76,9 +76,9 @@ namespace SQLServerInteraction.Tests
         {
             string table = CreateCustomers();
 
-            Db.ExecuteSQL($"INSERT INTO dbo.{table} VALUES (1, N'Contoso', N'West')");
+            await Db.ExecuteSQLAsync($"INSERT INTO dbo.{table} VALUES (1, N'Contoso', N'West')");
             await Db.ExecuteSQLAsync($"INSERT INTO dbo.{table} VALUES (2, N'Fabrikam', N'East')");
-            Db.ExecuteNonQueryWithParameters($"UPDATE dbo.{table} SET Region = @Region WHERE CustomerId = @Id",
+            await Db.ExecuteNonQueryWithParametersAsync($"UPDATE dbo.{table} SET Region = @Region WHERE CustomerId = @Id",
                 new Dictionary<string, object> { ["Region"] = "South", ["Id"] = 1 });
             await Db.ExecuteNonQueryWithParametersAsync($"DELETE FROM dbo.{table} WHERE CustomerId = @Id",
                 new Dictionary<string, object> { ["Id"] = 2 });
@@ -94,11 +94,11 @@ namespace SQLServerInteraction.Tests
             string procedure = "P_" + Guid.NewGuid().ToString("N");
             Database.Execute($"CREATE PROCEDURE dbo.{procedure} @Id int, @Name nvarchar(50) AS INSERT INTO dbo.{table} (CustomerId, Name) VALUES (@Id, @Name)");
 
-            Db.ExecuteStoredProcedure("dbo." + procedure, [new SqlParameter("@Id", 1), new SqlParameter("@Name", "Contoso")]);
+            await Db.ExecuteStoredProcedureAsync("dbo." + procedure, [new SqlParameter("@Id", 1), new SqlParameter("@Name", "Contoso")]);
             await Db.ExecuteStoredProcedureAsync("dbo." + procedure, [new SqlParameter("@Id", 2), new SqlParameter("@Name", "Fabrikam")]);
 
             Assert.Equal(2, Count(table));
-            Assert.Equal(["@Id", "@Name"], Db.GetStoredProcedureParameters("dbo." + procedure));
+            Assert.Equal(["@Id", "@Name"], await Db.GetStoredProcedureParametersAsync("dbo." + procedure));
         }
 
         [Fact]
@@ -137,24 +137,24 @@ namespace SQLServerInteraction.Tests
         {
             string table = CreateCustomers();
 
-            Db.BulkCopy(Rows((1, "Contoso"), (2, "Fabrikam")), "dbo." + table);
+            await Db.BulkCopyAsync(Rows((1, "Contoso"), (2, "Fabrikam")), "dbo." + table);
             Assert.Equal(2, Count(table));
 
             await Db.BulkCopyAsync(Rows((3, "Northwind")), table, flushTable: true);
             Assert.Equal(1, Count(table));
 
-            Db.BulkCopy(Rows((4, "Litware")), table, flushTable: true, flushWhereClauseCondition: "CustomerId = 3", batchSize: 1, useTransaction: false);
+            await Db.BulkCopyAsync(Rows((4, "Litware")), table, flushTable: true, flushWhereClauseCondition: "CustomerId = 3", batchSize: 1, useTransaction: false);
             Assert.Equal(1, Count(table, "CustomerId = 4"));
             Assert.Equal(1, Count(table));
         }
 
         [Fact]
-        public void BulkCopy_rolls_back_the_flush_when_the_copy_fails()
+        public async Task BulkCopy_rolls_back_the_flush_when_the_copy_fails()
         {
             string table = CreateCustomers();
             Database.Execute($"INSERT INTO dbo.{table} VALUES (1, N'Contoso', N'West')");
 
-            Assert.ThrowsAny<Exception>(() => Db.BulkCopy(Rows((2, "A"), (2, "B")), table, flushTable: true));
+            await Assert.ThrowsAnyAsync<Exception>(() => Db.BulkCopyAsync(Rows((2, "A"), (2, "B")), table, flushTable: true));
 
             Assert.Equal(1, Count(table, "CustomerId = 1"));
         }
@@ -170,7 +170,7 @@ namespace SQLServerInteraction.Tests
             Database.Execute($"INSERT INTO dbo.{target} VALUES (1, N'Contoso', N'West'), (2, N'Fabrikam', N'East')");
             Database.Execute($"INSERT INTO dbo.{source} VALUES (2, N'Fabrikam Ltd', N'East'), (3, N'Northwind', N'North')");
 
-            int rows = Db.MergeData(source, "dbo." + target, ["CustomerId"], ["Name", "Region"]);
+            int rows = await Db.MergeDataAsync(source, "dbo." + target, ["CustomerId"], ["Name", "Region"]);
 
             Assert.Equal(2, rows);
             Assert.Equal(3, Count(target));
@@ -189,14 +189,14 @@ namespace SQLServerInteraction.Tests
         }
 
         [Fact]
-        public void MergeData_with_no_value_columns_inserts_the_missing_keys_only()
+        public async Task MergeData_with_no_value_columns_inserts_the_missing_keys_only()
         {
             string target = CreateCustomers();
             string source = CreateCustomers();
             Database.Execute($"INSERT INTO dbo.{target} VALUES (1, N'Contoso', N'West')");
             Database.Execute($"INSERT INTO dbo.{source} VALUES (1, N'Changed', N'Changed'), (2, N'Fabrikam', N'East')");
 
-            int rows = Db.MergeData(source, target, ["CustomerId"], []);
+            int rows = await Db.MergeDataAsync(source, target, ["CustomerId"], []);
 
             Assert.Equal(1, rows);
             Assert.Equal("Contoso", Value(target, "Name", 1));
@@ -209,7 +209,7 @@ namespace SQLServerInteraction.Tests
             string table = CreateCustomers();
             Database.Execute($"INSERT INTO dbo.{table} VALUES (1, N'Contoso', N'East'), (2, N'Fabrikam', N'East')");
 
-            int rows = Db.BulkMerge(Rows((2, "Fabrikam Ltd"), (3, "Northwind")), "dbo." + table, ["CustomerId"]);
+            int rows = await Db.BulkMergeAsync(Rows((2, "Fabrikam Ltd"), (3, "Northwind")), "dbo." + table, ["CustomerId"]);
 
             Assert.Equal(2, rows);
             Assert.Equal(3, Count(table));
@@ -243,7 +243,7 @@ namespace SQLServerInteraction.Tests
         }
 
         [Fact]
-        public void BulkMerge_into_an_identity_table_keys_on_another_column_and_leaves_the_identity_out()
+        public async Task BulkMerge_into_an_identity_table_keys_on_another_column_and_leaves_the_identity_out()
         {
             string table = Database.CreateTable("CustomerId int IDENTITY(10, 10) NOT NULL PRIMARY KEY, Name nvarchar(50) NOT NULL UNIQUE, Region nvarchar(20) NULL");
             Database.Execute($"INSERT INTO dbo.{table} (Name, Region) VALUES (N'Contoso', N'West')");
@@ -253,13 +253,13 @@ namespace SQLServerInteraction.Tests
             rows.Rows.Add("Contoso", "East");
             rows.Rows.Add("Fabrikam", "North");
 
-            Assert.Equal(2, Db.BulkMerge(rows, table, ["Name"]));
+            Assert.Equal(2, await Db.BulkMergeAsync(rows, table, ["Name"]));
 
             Assert.Equal("East", Value(table, "Region", 10));
             Assert.Equal("Fabrikam", Value(table, "Name", 20));
 
             // The identity column cannot be carried: SQL Server refuses the merge's insert into it even when every row matches.
-            Assert.ThrowsAny<SqlException>(() => Db.BulkMerge(Rows((10, "Contoso")), table, ["CustomerId"]));
+            await Assert.ThrowsAnyAsync<SqlException>(() => Db.BulkMergeAsync(Rows((10, "Contoso")), table, ["CustomerId"]));
             Assert.Equal(2, Count(table));
         }
 
@@ -270,29 +270,29 @@ namespace SQLServerInteraction.Tests
             Database.Execute($"INSERT INTO dbo.{table} VALUES (1, N'Contoso', N'West')");
 
             // Two rows with one key: MERGE refuses to update the same row twice.
-            Assert.ThrowsAny<SqlException>(() => Db.BulkMerge(Rows((1, "A"), (1, "B")), table, ["CustomerId"]));
+            await Assert.ThrowsAnyAsync<SqlException>(() => Db.BulkMergeAsync(Rows((1, "A"), (1, "B")), table, ["CustomerId"]));
             await Assert.ThrowsAnyAsync<SqlException>(() => Db.BulkMergeAsync(Rows((1, "A"), (1, "B")), table, ["CustomerId"], useTransaction: false));
             // A column the table does not have fails before anything is copied.
             var rows = Rows((1, "A"));
             rows.Columns.Add("NoSuchColumn", typeof(int));
-            Assert.ThrowsAny<SqlException>(() => Db.BulkMerge(rows, table, ["CustomerId"]));
+            await Assert.ThrowsAnyAsync<SqlException>(() => Db.BulkMergeAsync(rows, table, ["CustomerId"]));
 
             Assert.Equal("Contoso", Value(table, "Name", 1));
             Assert.Equal(1, Count(table));
         }
 
         [Fact]
-        public void A_merge_with_bad_arguments_is_refused_before_anything_runs()
+        public async Task A_merge_with_bad_arguments_is_refused_before_anything_runs()
         {
             string table = CreateCustomers();
 
-            Assert.Throws<ArgumentException>(() => Db.MergeData(table, table, [], ["Name"]));
-            Assert.Throws<ArgumentException>(() => Db.MergeData(table, table, ["CustomerId"], ["Name", "customerid"]));
-            Assert.Throws<ArgumentException>(() => Db.MergeData("[" + table, table, ["CustomerId"], []));
-            Assert.Throws<ArgumentException>(() => Db.BulkMerge(Rows((1, "A")), table, []));
-            Assert.Throws<ArgumentException>(() => Db.BulkMerge(Rows((1, "A")), table, ["NoSuchColumn"]));
-            Assert.Throws<ArgumentException>(() => Db.BulkMerge(new DataTable(), table, ["CustomerId"]));
-            Assert.Throws<ArgumentException>(() => Db.BulkMerge(Rows((1, "A")), "a.b.c.d", ["CustomerId"]));
+            await Assert.ThrowsAsync<ArgumentException>(() => Db.MergeDataAsync(table, table, [], ["Name"]));
+            await Assert.ThrowsAsync<ArgumentException>(() => Db.MergeDataAsync(table, table, ["CustomerId"], ["Name", "customerid"]));
+            await Assert.ThrowsAsync<ArgumentException>(() => Db.MergeDataAsync("[" + table, table, ["CustomerId"], []));
+            await Assert.ThrowsAsync<ArgumentException>(() => Db.BulkMergeAsync(Rows((1, "A")), table, []));
+            await Assert.ThrowsAsync<ArgumentException>(() => Db.BulkMergeAsync(Rows((1, "A")), table, ["NoSuchColumn"]));
+            await Assert.ThrowsAsync<ArgumentException>(() => Db.BulkMergeAsync(new DataTable(), table, ["CustomerId"]));
+            await Assert.ThrowsAsync<ArgumentException>(() => Db.BulkMergeAsync(Rows((1, "A")), "a.b.c.d", ["CustomerId"]));
 
             Assert.Equal(0, Count(table));
         }

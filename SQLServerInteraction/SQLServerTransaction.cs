@@ -6,26 +6,25 @@ namespace SQLServerInteraction
     /// One connection with one open transaction, on which the data methods of
     /// <see cref="SQLServerInstance"/> run together: queries, commands, inserts,
     /// updates, deletes, merges, bulk copies and index changes. Get one from
-    /// <see cref="SQLServerInstance.BeginTransaction()"/>, call the methods, then
-    /// <see cref="Commit"/>. Disposing it without a commit rolls everything back
-    /// and closes the connection, so a <c>using</c> block is enough on failure.
+    /// <see cref="SQLServerInstance.BeginTransactionAsync(CancellationToken)"/>, call the
+    /// methods, then <see cref="CommitAsync"/>. Disposing it without a commit rolls
+    /// everything back and closes the connection, so an <c>await using</c> block is
+    /// enough on failure.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// After an exception from any method, roll back, or let the <c>using</c> block
-    /// do it. Do not catch the exception and carry on to <see cref="Commit"/>: SQL
-    /// Server fails only the statement for some errors, such as a constraint
+    /// After an exception from any method, roll back, or let the <c>await using</c>
+    /// block do it. Do not catch the exception and carry on to <see cref="CommitAsync"/>:
+    /// SQL Server fails only the statement for some errors, such as a constraint
     /// violation, and leaves the transaction open, so the commit would keep the
     /// work done before the failure. To undo part of a transaction on purpose,
-    /// use <see cref="Save"/> and <see cref="RollbackTo"/>.
+    /// use <see cref="SaveAsync"/> and <see cref="RollbackToAsync"/>.
     /// </para>
     /// <para>
     /// Every method throws <see cref="InvalidOperationException"/> after the
-    /// transaction is committed or rolled back, and
-    /// <see cref="ObjectDisposedException"/> after it is disposed. Each async
-    /// method takes an optional <see cref="CancellationToken"/> as its last
-    /// argument. The object is not thread-safe: use it from one thread, or one
-    /// async flow, at a time.
+    /// transaction is committed or rolled back, or after a commit that failed, and
+    /// <see cref="ObjectDisposedException"/> after it is disposed. The object is
+    /// not thread-safe: use it from one async flow at a time.
     /// </para>
     /// </remarks>
     public sealed partial class SQLServerTransaction : IDisposable, IAsyncDisposable
@@ -72,26 +71,6 @@ namespace SQLServerInteraction
         /// <summary>
         /// Commits the transaction. The connection stays open until the object is disposed, but no method can run after this.
         /// </summary>
-        /// <exception cref="InvalidOperationException">The transaction was already committed or rolled back.</exception>
-        /// <exception cref="ObjectDisposedException">The object was disposed.</exception>
-        public void Commit()
-        {
-            var transaction = OpenTransaction;
-            try
-            {
-                transaction.Commit();
-            }
-            catch
-            {
-                _closedBecause = CommitFailed;
-                throw;
-            }
-            _closedBecause = Committed;
-        }
-
-        /// <summary>
-        /// Asynchronously commits the transaction. The connection stays open until the object is disposed, but no method can run after this.
-        /// </summary>
         /// <param name="cancellationToken">A token to cancel the commit.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
         /// <exception cref="InvalidOperationException">The transaction was already committed or rolled back.</exception>
@@ -114,17 +93,6 @@ namespace SQLServerInteraction
         /// <summary>
         /// Rolls the transaction back. Disposing without a commit does the same, so this is only needed to roll back early.
         /// </summary>
-        /// <exception cref="InvalidOperationException">The transaction was already committed or rolled back.</exception>
-        /// <exception cref="ObjectDisposedException">The object was disposed.</exception>
-        public void Rollback()
-        {
-            OpenTransaction.Rollback();
-            _closedBecause = RolledBack;
-        }
-
-        /// <summary>
-        /// Asynchronously rolls the transaction back. Disposing without a commit does the same, so this is only needed to roll back early.
-        /// </summary>
         /// <param name="cancellationToken">A token to cancel the rollback.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
         /// <exception cref="InvalidOperationException">The transaction was already committed or rolled back.</exception>
@@ -136,21 +104,7 @@ namespace SQLServerInteraction
         }
 
         /// <summary>
-        /// Marks a savepoint, so that the work after it can be undone with <see cref="RollbackTo"/> while the transaction stays open.
-        /// </summary>
-        /// <param name="savepointName">A name of up to 32 characters, plain or bracketed, quoted as an identifier. Marking it again moves it.</param>
-        /// <exception cref="ArgumentException">The name is not a valid single name, or is longer than 32 characters.</exception>
-        /// <exception cref="InvalidOperationException">The transaction was already committed or rolled back.</exception>
-        /// <exception cref="ObjectDisposedException">The object was disposed.</exception>
-        public void Save(string savepointName)
-        {
-            string sql = SavepointSql("SAVE", savepointName);
-            _ = OpenTransaction;
-            ExecuteSQL(sql);
-        }
-
-        /// <summary>
-        /// Asynchronously marks a savepoint, so that the work after it can be undone with <see cref="RollbackToAsync"/> while the transaction stays open.
+        /// Marks a savepoint, so that the work after it can be undone with <see cref="RollbackToAsync"/> while the transaction stays open.
         /// </summary>
         /// <param name="savepointName">A name of up to 32 characters, plain or bracketed, quoted as an identifier. Marking it again moves it.</param>
         /// <param name="cancellationToken">A token to cancel the operation.</param>
@@ -166,28 +120,13 @@ namespace SQLServerInteraction
         }
 
         /// <summary>
-        /// Undoes the work done since <see cref="Save"/> marked the savepoint. The transaction stays open, and the savepoint can be rolled back to again.
+        /// Undoes the work done since <see cref="SaveAsync"/> marked the savepoint. The transaction stays open, and the savepoint can be rolled back to again.
         /// </summary>
         /// <remarks>
         /// This works after an error that failed one statement, such as a constraint violation. After an error that
         /// made the transaction uncommittable, such as a deadlock or a conversion failure, SQL Server refuses to roll
-        /// back to a savepoint, and the exception says so; only a full <see cref="Rollback"/>, or disposing, is left.
+        /// back to a savepoint, and the exception says so; only a full <see cref="RollbackAsync"/>, or disposing, is left.
         /// </remarks>
-        /// <param name="savepointName">The name given to <see cref="Save"/>.</param>
-        /// <exception cref="ArgumentException">The name is not a valid single name, or is longer than 32 characters.</exception>
-        /// <exception cref="InvalidOperationException">The transaction was already committed or rolled back.</exception>
-        /// <exception cref="ObjectDisposedException">The object was disposed.</exception>
-        public void RollbackTo(string savepointName)
-        {
-            string sql = SavepointSql("ROLLBACK", savepointName);
-            _ = OpenTransaction;
-            ExecuteSQL(sql);
-        }
-
-        /// <summary>
-        /// Asynchronously undoes the work done since <see cref="SaveAsync"/> marked the savepoint. The transaction stays open, and the savepoint can be rolled back to again.
-        /// </summary>
-        /// <inheritdoc cref="RollbackTo" path="/remarks"/>
         /// <param name="savepointName">The name given to <see cref="SaveAsync"/>.</param>
         /// <param name="cancellationToken">A token to cancel the operation.</param>
         /// <returns>A task representing the asynchronous operation.</returns>

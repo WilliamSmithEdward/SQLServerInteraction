@@ -27,21 +27,21 @@ namespace SQLServerInteraction.Tests
         }
 
         [Fact]
-        public void A_delete_and_an_insert_commit_together()
+        public async Task A_delete_and_an_insert_commit_together()
         {
             string table = CreateCustomers();
 
-            using (var transaction = Db.BeginTransaction())
+            await using (var transaction = await Db.BeginTransactionAsync())
             {
-                transaction.DeleteData(table, "CustomerId = @Id", new Dictionary<string, object> { ["Id"] = 1 });
-                transaction.InsertData(table, new Dictionary<string, object> { ["CustomerId"] = 3, ["Name"] = "Northwind" });
-                transaction.UpdateData(table, new Dictionary<string, object> { ["Region"] = "South" }, "CustomerId = 2");
+                await transaction.DeleteDataAsync(table, "CustomerId = @Id", new Dictionary<string, object> { ["Id"] = 1 });
+                await transaction.InsertDataAsync(table, new Dictionary<string, object> { ["CustomerId"] = 3, ["Name"] = "Northwind" });
+                await transaction.UpdateDataAsync(table, new Dictionary<string, object> { ["Region"] = "South" }, "CustomerId = 2");
 
                 // The transaction sees its own work before the commit.
-                Assert.Equal(2, transaction.ExecuteScalar<int>($"SELECT COUNT(*) FROM dbo.{table}"));
-                Assert.Equal(["Fabrikam", "Northwind"], transaction.ExecuteQuery<string>($"SELECT Name FROM dbo.{table} ORDER BY CustomerId"));
+                Assert.Equal(2, await transaction.ExecuteScalarAsync<int>($"SELECT COUNT(*) FROM dbo.{table}"));
+                Assert.Equal(["Fabrikam", "Northwind"], await transaction.ExecuteQueryAsync<string>($"SELECT Name FROM dbo.{table} ORDER BY CustomerId"));
 
-                transaction.Commit();
+                await transaction.CommitAsync();
             }
 
             Assert.Equal(2, Count(table));
@@ -50,15 +50,15 @@ namespace SQLServerInteraction.Tests
         }
 
         [Fact]
-        public void Disposing_without_a_commit_rolls_back()
+        public async Task Disposing_without_a_commit_rolls_back()
         {
             string table = CreateCustomers();
 
-            using (var transaction = Db.BeginTransaction())
+            await using (var transaction = await Db.BeginTransactionAsync())
             {
-                transaction.DeleteData(table, "1 = 1");
-                transaction.ExecuteSQL($"INSERT INTO dbo.{table} VALUES (9, N'Gone', NULL)");
-                Assert.Equal(1, transaction.ExecuteScalar<int>($"SELECT COUNT(*) FROM dbo.{table}"));
+                await transaction.DeleteDataAsync(table, "1 = 1");
+                await transaction.ExecuteSQLAsync($"INSERT INTO dbo.{table} VALUES (9, N'Gone', NULL)");
+                Assert.Equal(1, await transaction.ExecuteScalarAsync<int>($"SELECT COUNT(*) FROM dbo.{table}"));
             }
 
             Assert.Equal(2, Count(table));
@@ -66,51 +66,51 @@ namespace SQLServerInteraction.Tests
         }
 
         [Fact]
-        public void A_failure_inside_a_using_block_rolls_back_the_earlier_work()
+        public async Task A_failure_inside_a_using_block_rolls_back_the_earlier_work()
         {
             string table = CreateCustomers();
 
-            Assert.ThrowsAny<SqlException>(() =>
+            await Assert.ThrowsAnyAsync<SqlException>(async () =>
             {
-                using var transaction = Db.BeginTransaction();
-                transaction.DeleteData(table, "CustomerId = 1");
-                transaction.InsertData(table, new Dictionary<string, object> { ["CustomerId"] = 2, ["Name"] = "Duplicate key" });
-                transaction.Commit();
+                await using var transaction = await Db.BeginTransactionAsync();
+                await transaction.DeleteDataAsync(table, "CustomerId = 1");
+                await transaction.InsertDataAsync(table, new Dictionary<string, object> { ["CustomerId"] = 2, ["Name"] = "Duplicate key" });
+                await transaction.CommitAsync();
             });
 
             Assert.Equal(2, Count(table));
         }
 
         [Fact]
-        public void Rollback_undoes_the_work_and_ends_the_transaction()
+        public async Task Rollback_undoes_the_work_and_ends_the_transaction()
         {
             string table = CreateCustomers();
 
-            using var transaction = Db.BeginTransaction(IsolationLevel.Serializable);
-            transaction.DeleteData(table, "1 = 1");
-            transaction.Rollback();
+            await using var transaction = await Db.BeginTransactionAsync(IsolationLevel.Serializable);
+            await transaction.DeleteDataAsync(table, "1 = 1");
+            await transaction.RollbackAsync();
 
             Assert.Equal(2, Count(table));
-            Assert.Throws<InvalidOperationException>(() => transaction.DeleteData(table, "1 = 1"));
-            Assert.Throws<InvalidOperationException>(() => transaction.Commit());
+            await Assert.ThrowsAsync<InvalidOperationException>(() => transaction.DeleteDataAsync(table, "1 = 1"));
+            await Assert.ThrowsAsync<InvalidOperationException>(() => transaction.CommitAsync());
         }
 
         [Fact]
-        public void Nothing_runs_after_a_commit_or_a_dispose()
+        public async Task Nothing_runs_after_a_commit_or_a_dispose()
         {
             string table = CreateCustomers();
 
-            var transaction = Db.BeginTransaction();
-            transaction.InsertData(table, new Dictionary<string, object> { ["CustomerId"] = 3 });
-            transaction.Commit();
+            var transaction = await Db.BeginTransactionAsync();
+            await transaction.InsertDataAsync(table, new Dictionary<string, object> { ["CustomerId"] = 3 });
+            await transaction.CommitAsync();
 
-            Assert.Throws<InvalidOperationException>(() => transaction.ExecuteScalar<int>("SELECT 1"));
-            Assert.Throws<InvalidOperationException>(() => transaction.Rollback());
+            await Assert.ThrowsAsync<InvalidOperationException>(() => transaction.ExecuteScalarAsync<int>("SELECT 1"));
+            await Assert.ThrowsAsync<InvalidOperationException>(() => transaction.RollbackAsync());
 
             transaction.Dispose();
             transaction.Dispose();
 
-            Assert.Throws<ObjectDisposedException>(() => transaction.ExecuteSQL("SELECT 1"));
+            await Assert.ThrowsAsync<ObjectDisposedException>(() => transaction.ExecuteSQLAsync("SELECT 1"));
             Assert.Equal(3, Count(table));
         }
 
@@ -173,7 +173,7 @@ namespace SQLServerInteraction.Tests
         {
             string table = CreateCustomers();
 
-            Db.ExecuteTransaction([$"DELETE FROM dbo.{table} WHERE CustomerId = 1", $"INSERT INTO dbo.{table} VALUES (3, N'Northwind', NULL)"]);
+            await Db.ExecuteTransactionAsync([$"DELETE FROM dbo.{table} WHERE CustomerId = 1", $"INSERT INTO dbo.{table} VALUES (3, N'Northwind', NULL)"]);
             Assert.Equal(2, Count(table));
 
             await Assert.ThrowsAnyAsync<SqlException>(() => Db.ExecuteTransactionAsync([$"DELETE FROM dbo.{table} WHERE CustomerId = 2", "SELECT 1/0"]));
@@ -181,26 +181,26 @@ namespace SQLServerInteraction.Tests
         }
 
         [Fact]
-        public void A_savepoint_undoes_the_work_after_it_and_keeps_the_rest()
+        public async Task A_savepoint_undoes_the_work_after_it_and_keeps_the_rest()
         {
             string table = CreateCustomers();
 
-            using (var transaction = Db.BeginTransaction())
+            await using (var transaction = await Db.BeginTransactionAsync())
             {
-                transaction.InsertData(table, new Dictionary<string, object> { ["CustomerId"] = 3, ["Name"] = "Kept" });
-                transaction.Save("after third");
-                transaction.DeleteData(table, "1 = 1");
-                transaction.Save("[after third]"); // the same name again moves the savepoint
-                transaction.InsertData(table, new Dictionary<string, object> { ["CustomerId"] = 4, ["Name"] = "Undone" });
-                transaction.RollbackTo("after third");
+                await transaction.InsertDataAsync(table, new Dictionary<string, object> { ["CustomerId"] = 3, ["Name"] = "Kept" });
+                await transaction.SaveAsync("after third");
+                await transaction.DeleteDataAsync(table, "1 = 1");
+                await transaction.SaveAsync("[after third]"); // the same name again moves the savepoint
+                await transaction.InsertDataAsync(table, new Dictionary<string, object> { ["CustomerId"] = 4, ["Name"] = "Undone" });
+                await transaction.RollbackToAsync("after third");
 
-                Assert.Equal(0, transaction.ExecuteScalar<int>($"SELECT COUNT(*) FROM dbo.{table}"));
-                transaction.IndexCreate(table, "Name");
-                transaction.Commit();
+                Assert.Equal(0, await transaction.ExecuteScalarAsync<int>($"SELECT COUNT(*) FROM dbo.{table}"));
+                await transaction.IndexCreateAsync(table, "Name");
+                await transaction.CommitAsync();
             }
 
             Assert.Equal(0, Count(table));
-            Assert.Equal(["IX_Name"], Db.GetTableIndexs(table));
+            Assert.Equal(["IX_Name"], await Db.GetTableIndexesAsync(table));
         }
 
         [Fact]
@@ -215,8 +215,8 @@ namespace SQLServerInteraction.Tests
             Assert.Equal(2, await transaction.ExecuteScalarAsync<int>($"SELECT COUNT(*) FROM dbo.{table}", Ct));
 
             await Assert.ThrowsAsync<ArgumentException>(() => transaction.SaveAsync(new string('x', 33), Ct));
-            Assert.Throws<ArgumentException>(() => transaction.Save("a.b"));
-            Assert.Throws<ArgumentException>(() => transaction.RollbackTo(""));
+            await Assert.ThrowsAsync<ArgumentException>(() => transaction.SaveAsync("a.b"));
+            await Assert.ThrowsAsync<ArgumentException>(() => transaction.RollbackToAsync(""));
 
             await transaction.CommitAsync(Ct);
             Assert.Equal(2, Count(table));
@@ -228,9 +228,9 @@ namespace SQLServerInteraction.Tests
             string table = CreateCustomers();
 
             await using var transaction = await Db.BeginTransactionAsync(Ct);
-            Assert.Equal(1, transaction.BulkMerge(Rows((3, "Northwind")), table, ["CustomerId"]));
+            Assert.Equal(1, await transaction.BulkMergeAsync(Rows((3, "Northwind")), table, ["CustomerId"]));
             Assert.Equal(2, await transaction.BulkMergeAsync(Rows((3, "Northwind Traders"), (4, "Litware")), table, ["CustomerId"], cancellationToken: Ct));
-            Assert.Equal(5, transaction.BulkMerge(Rows((5, "Adatum")), table, ["CustomerId"], deleteUnmatched: true)); // one inserted, four deleted
+            Assert.Equal(5, await transaction.BulkMergeAsync(Rows((5, "Adatum")), table, ["CustomerId"], deleteUnmatched: true)); // one inserted, four deleted
             await transaction.CommitAsync(Ct);
 
             Assert.Equal(1, Count(table));
@@ -238,19 +238,19 @@ namespace SQLServerInteraction.Tests
         }
 
         [Fact]
-        public void A_failed_commit_closes_the_transaction_with_a_reason()
+        public async Task A_failed_commit_closes_the_transaction_with_a_reason()
         {
             string table = CreateCustomers();
 
-            using var transaction = Db.BeginTransaction();
-            transaction.DeleteData(table, "1 = 1");
-            short spid = transaction.ExecuteScalar<short>("SELECT @@SPID");
+            await using var transaction = await Db.BeginTransactionAsync();
+            await transaction.DeleteDataAsync(table, "1 = 1");
+            short spid = await transaction.ExecuteScalarAsync<short>("SELECT @@SPID");
             Database.Execute($"KILL {spid}");
 
-            Assert.ThrowsAny<Exception>(() => transaction.Commit());
-            var afterwards = Assert.Throws<InvalidOperationException>(() => transaction.Rollback());
+            await Assert.ThrowsAnyAsync<Exception>(() => transaction.CommitAsync());
+            var afterwards = await Assert.ThrowsAsync<InvalidOperationException>(() => transaction.RollbackAsync());
             Assert.Contains("commit failed", afterwards.Message);
-            Assert.Throws<InvalidOperationException>(() => transaction.ExecuteScalar<int>("SELECT 1"));
+            await Assert.ThrowsAsync<InvalidOperationException>(() => transaction.ExecuteScalarAsync<int>("SELECT 1"));
 
             transaction.Dispose();
             Assert.Equal(2, Count(table));
@@ -268,6 +268,8 @@ namespace SQLServerInteraction.Tests
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => transaction.DeleteDataAsync(table, "CustomerId = 2", cancelled));
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => transaction.ExecuteQueryAsync($"SELECT * FROM dbo.{table}", cancelled));
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Db.BeginTransactionAsync(cancelled));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Db.ExecuteScalarAsync<int>("SELECT 1", cancelled));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Db.GetTableNamesAsync(cancelled));
 
             await transaction.RollbackAsync(Ct);
             Assert.Equal(2, Count(table));
