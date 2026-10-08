@@ -194,3 +194,33 @@ tool = "Semgrep"
 rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
 reason = "InsertDataAsync<T> builds its SQL from the table name and the column names from ColumnAttribute or the property names, each quoted by SqlIdentifier.Quote, and sends every value as a parameter (@__value_0, ...). The integration tests InjectionTests.InsertData_of_T_reads_hostile_table_and_column_names_as_names insert through it into a table and a column whose names carry DROP TABLE and check the victims survive."
 where = [{ path = "SQLServerInteraction/InsertDataTAsync.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+
+[[finding]]
+tool = "Semgrep"
+rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
+reason = "MergeData builds its MERGE from the two table names and the key and value column names, each quoted by SqlIdentifier.Quote, so every name is read as a name; there are no values, since the rows come from the source table. The integration test InjectionTests.MergeData_and_BulkMerge_read_hostile_table_and_column_names_as_names runs it on tables and a column whose names carry DROP TABLE and checks the victim survives."
+where = [{ path = "SQLServerInteraction/MergeData.cs", line = "using var command = new SqlCommand(sql, connection, transaction);" }]
+
+[[finding]]
+tool = "Semgrep"
+rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
+reason = "MergeDataAsync builds its MERGE from the two table names and the key and value column names, each quoted by SqlIdentifier.Quote, so every name is read as a name; there are no values, since the rows come from the source table. The integration test InjectionTests.MergeData_and_BulkMerge_read_hostile_table_and_column_names_as_names runs it on tables and a column whose names carry DROP TABLE and checks the victim survives."
+where = [{ path = "SQLServerInteraction/MergeDataAsync.cs", line = "using var command = new SqlCommand(sql, connection, transaction);" }]
+
+[[finding]]
+tool = "Semgrep"
+rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
+reason = "BulkMerge builds its SELECT INTO and MERGE from the table name, quoted by SqlIdentifier.Quote, and the DataTable's column names, each bracketed by SqlIdentifier.QuotePart, so every name is read as a name; the rows go through SqlBulkCopy into a temporary table, never into the SQL. The integration test InjectionTests.MergeData_and_BulkMerge_read_hostile_table_and_column_names_as_names runs it on a table and a column whose names carry DROP TABLE and checks the victim survives."
+where = [
+  { path = "SQLServerInteraction/BulkMerge.cs", line = "using (var staging = new SqlCommand(stagingSql, connection, transaction))" },
+  { path = "SQLServerInteraction/BulkMerge.cs", line = "using var merge = new SqlCommand(mergeSql, connection, transaction);" },
+]
+
+[[finding]]
+tool = "Semgrep"
+rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
+reason = "BulkMergeAsync builds its SELECT INTO and MERGE from the table name, quoted by SqlIdentifier.Quote, and the DataTable's column names, each bracketed by SqlIdentifier.QuotePart, so every name is read as a name; the rows go through SqlBulkCopy into a temporary table, never into the SQL. The integration test InjectionTests.MergeData_and_BulkMerge_read_hostile_table_and_column_names_as_names runs it on a table and a column whose names carry DROP TABLE and checks the victim survives."
+where = [
+  { path = "SQLServerInteraction/BulkMergeAsync.cs", line = "using (var staging = new SqlCommand(stagingSql, connection, transaction))" },
+  { path = "SQLServerInteraction/BulkMergeAsync.cs", line = "using var merge = new SqlCommand(mergeSql, connection, transaction);" },
+]
