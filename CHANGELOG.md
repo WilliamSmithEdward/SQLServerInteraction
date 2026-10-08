@@ -9,6 +9,14 @@ with the date nuget.org records for each upload. Neither nuget.org nor the
 repository carried release notes for them. Versions 1.0.0 to 1.0.18 are
 unlisted on nuget.org.
 
+## [2.1.0] - 2026-10-08
+
+### Additions
+
+* `MergeData` and `MergeDataAsync` merge one table into another with a `MERGE` statement: a target row whose key columns match a source row is updated, a source row with no match is inserted, and with `deleteUnmatched` a target row with no match is deleted. Every name is quoted as an identifier, and the method returns the number of rows affected.
+* `BulkMerge` and `BulkMergeAsync` bulk copy a DataTable into a temporary table and merge it into the destination in one transaction, matching columns by name. They take the same `deleteUnmatched`, a `timeout` for the copy and the merge, and `batchSize`.
+* All four take `useTransaction`, true by default, as `BulkCopy` does.
+
 ## [2.0.1] - 2026-10-04
 
 * The NuGet package now embeds the root GitHub `README.md`, including its badges, as its only README. The OpenSSF Scorecard badge is served through `img.shields.io`, which NuGet supports.

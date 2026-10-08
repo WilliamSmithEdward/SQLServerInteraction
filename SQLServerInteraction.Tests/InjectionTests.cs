@@ -83,6 +83,31 @@ namespace SQLServerInteraction.Tests
             Assert.True(Exists(victim));
         }
 
+        [Fact]
+        public async Task MergeData_and_BulkMerge_read_hostile_table_and_column_names_as_names()
+        {
+            string victim = CreateVictim();
+            string column = $"c] = 1; DROP TABLE {victim}; --";
+            string quotedColumn = SqlIdentifier.QuotePart(column);
+            string source = Database.CreateTable($"Id int NOT NULL PRIMARY KEY, {quotedColumn} nvarchar(50) NULL", $"y]; DROP TABLE {victim}; --");
+            string target = Database.CreateTable($"Id int NOT NULL PRIMARY KEY, {quotedColumn} nvarchar(50) NULL", $"x]; DROP TABLE {victim}; --");
+            Database.Execute($"INSERT INTO dbo.{SqlIdentifier.QuotePart(source)} VALUES (1, N'Contoso'), (2, N'Fabrikam')");
+            Database.Execute($"INSERT INTO dbo.{SqlIdentifier.QuotePart(target)} VALUES (1, N'Old'), (9, N'Gone')");
+            var rows = new DataTable();
+            rows.Columns.Add("Id", typeof(int));
+            rows.Columns.Add(column, typeof(string));
+            rows.Rows.Add(3, "Northwind");
+
+            Assert.Equal(2, Db.MergeData(source, target, ["Id"], [quotedColumn]));
+            Assert.Equal(3, await Db.MergeDataAsync("dbo." + SqlIdentifier.QuotePart(source), target, ["[Id]"], [quotedColumn], deleteUnmatched: true));
+            Assert.Equal(1, Db.BulkMerge(rows, target, ["Id"]));
+            Assert.Equal(3, await Db.BulkMergeAsync(rows, "dbo." + SqlIdentifier.QuotePart(target), [quotedColumn], deleteUnmatched: true));
+
+            Assert.Equal(1, Db.GetTableRowCount(target));
+            Assert.Equal("Northwind", Database.Scalar($"SELECT {quotedColumn} FROM dbo.{SqlIdentifier.QuotePart(target)} WHERE Id = 3"));
+            Assert.True(Exists(victim));
+        }
+
         /// <summary>The victim a ColumnAttribute names, which must be a constant.</summary>
         private const string ColumnAttributeVictim = "VictimOfInsertDataOfT";
 

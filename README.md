@@ -55,7 +55,7 @@ How `GetConnectionString()` builds the string:
 - A null or empty `UserId` gives `Integrated Security=True`, and the password is ignored. Otherwise the string carries `User ID` and `Password`.
 - `additionalParameters` is parsed as a connection string and merged in. Each of its keywords replaces the one the other arguments set, as it did when 1.x appended it to the end, so `"Encrypt=Strict"` there gives strict encryption. Text that is not a valid connection string, or an unknown keyword, throws `ArgumentException`.
 
-Constructing a `SQLServerInstance` does not connect. Each method call opens its own `SqlConnection` and disposes it before returning, so connection pooling is whatever the connection string sets (SqlClient pools by default). Commands use SqlClient's default 30-second command timeout; apart from `BulkCopy`, no method takes a timeout or a `CancellationToken`.
+Constructing a `SQLServerInstance` does not connect. Each method call opens its own `SqlConnection` and disposes it before returning, so connection pooling is whatever the connection string sets (SqlClient pools by default). Commands use SqlClient's default 30-second command timeout; apart from `BulkCopy` and `BulkMerge`, no method takes a timeout or a `CancellationToken`.
 
 Errors are not caught: a server error surfaces as SqlClient's `SqlException`, and a failed connection as whatever `SqlConnection.Open` throws.
 
@@ -267,6 +267,48 @@ db.BulkCopy(source, "dbo.Orders", flushTable: false, flushWhereClauseCondition: 
 | `batchSize` | `null` | Rows per batch sent to the server. `null` sends all rows in one batch. |
 | `useTransaction` | `true` | Run the delete and the copy in one transaction, rolled back if either fails, so readers never see the table half-written. With `false`, a failure can leave the table emptied or partly filled. |
 | `columnMappings` | `null` | Taken by the same overload as `flushParameters`, as its last argument. Each key is a DataTable column, matched without regard to case, and its value the destination column it is copied to; only mapped columns are copied, and the others in the destination get their defaults. A destination is a column name, not SQL, matched exactly, case included; brackets around it (`[Sales Region]`) are removed first, and a name with a space needs none. An empty dictionary, a key the DataTable does not have, or an empty destination throws `ArgumentException` before anything is deleted. A destination the table does not have fails when the copy runs, after the flush, which the transaction rolls back. `null` maps by position. |
+
+### Merging
+
+```csharp
+using System.Data;
+using SQLServerInteraction;
+
+var db = new SQLServerInstance(new SQLServerConnectionString("your-server", "YourDatabase"));
+
+// Table to table: update the orders whose OrderId is in Staging, insert the rest
+int affected = db.MergeData("dbo.Orders_Staging", "dbo.Orders",
+    keyColumns: ["OrderId"],
+    valueColumns: ["Total", "Status"]);
+
+// ... and delete the orders Staging no longer has
+affected = await db.MergeDataAsync("dbo.Orders_Staging", "dbo.Orders", ["OrderId"], ["Total", "Status"],
+    deleteUnmatched: true);
+
+// DataTable to table, in one transaction: bulk copy into a temporary table, then merge by OrderId
+var rows = new DataTable();
+rows.Columns.Add("OrderId", typeof(int));
+rows.Columns.Add("Total", typeof(decimal));
+rows.Rows.Add(1, 24.99m);
+rows.Rows.Add(3, 12.50m);
+
+affected = await db.BulkMergeAsync(rows, "dbo.Orders", keyColumns: ["OrderId"], timeout: 120);
+```
+
+`MergeData` runs one `MERGE` statement from the source table into the target: a target row whose key columns all equal a source row's is updated in the value columns, a source row with no match is inserted with its keys and values, and, with `deleteUnmatched`, a target row with no match is deleted. `BulkMerge` does the same for a DataTable: it creates a temporary table shaped like the destination's columns, bulk copies the rows into it, and merges from there, matching each DataTable column to the destination column of the same name, so the columns can be in any order. Every column the DataTable has that is not a key is a value column; a column the DataTable does not have is left alone on an update and takes its default on an insert.
+
+Both return the number of rows inserted, updated and deleted. Every table and column name is quoted as described under "Inserting, updating and deleting"; nothing in these methods is run as SQL you wrote.
+
+| Parameter | Default | Effect |
+|---|---|---|
+| `keyColumns` | required | The columns that identify a row. A NULL key never matches, so such a row is inserted on every merge. Two source rows with the same key fail the merge, and so does an empty list, before anything runs. |
+| `valueColumns` | required (`MergeData` only) | The columns to set on a matched row and to insert with the keys on a new one. Empty inserts the missing keys and leaves matched rows alone. A column in both lists throws `ArgumentException`. |
+| `deleteUnmatched` | `false` | Also delete every target row that matches no source row. |
+| `timeout` | `30` (`BulkMerge` only) | Seconds the copy may take, and then seconds the merge may take. |
+| `batchSize` | `null` (`BulkMerge` only) | Rows per batch sent to the temporary table. |
+| `useTransaction` | `true` | `BulkMerge`: run the copy and the merge in one transaction, rolled back if either fails. `MergeData`: hold the merge's locks until the transaction commits. A `MERGE` statement is atomic on its own, so with `false` a failure still leaves the target as it was. |
+
+Leave an identity column out of the value columns and the DataTable: the merge inserts every column it carries, and SQL Server refuses to insert into an identity column even when no row is new. Key on another column instead.
 
 ---
 

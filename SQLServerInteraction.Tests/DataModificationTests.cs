@@ -158,5 +158,143 @@ namespace SQLServerInteraction.Tests
 
             Assert.Equal(1, Count(table, "CustomerId = 1"));
         }
+
+        private string? Value(string table, string column, int customerId) =>
+            (string?)Database.Scalar($"SELECT [{column}] FROM dbo.{table} WHERE CustomerId = {customerId}");
+
+        [Fact]
+        public async Task MergeData_updates_matched_rows_inserts_the_rest_and_deletes_when_asked()
+        {
+            string target = CreateCustomers();
+            string source = CreateCustomers();
+            Database.Execute($"INSERT INTO dbo.{target} VALUES (1, N'Contoso', N'West'), (2, N'Fabrikam', N'East')");
+            Database.Execute($"INSERT INTO dbo.{source} VALUES (2, N'Fabrikam Ltd', N'East'), (3, N'Northwind', N'North')");
+
+            int rows = Db.MergeData(source, "dbo." + target, ["CustomerId"], ["Name", "Region"]);
+
+            Assert.Equal(2, rows);
+            Assert.Equal(3, Count(target));
+            Assert.Equal("Contoso", Value(target, "Name", 1));
+            Assert.Equal("Fabrikam Ltd", Value(target, "Name", 2));
+            Assert.Equal("North", Value(target, "Region", 3));
+
+            Database.Execute($"UPDATE dbo.{source} SET Name = N'Northwind Traders', Region = N'South' WHERE CustomerId = 3");
+            rows = await Db.MergeDataAsync("dbo." + source, target, ["[CustomerId]"], ["Region"], deleteUnmatched: true, useTransaction: false);
+
+            Assert.Equal(3, rows); // two matched rows updated, one unmatched row deleted
+            Assert.Equal(2, Count(target));
+            Assert.Equal(0, Count(target, "CustomerId = 1"));
+            Assert.Equal("Northwind", Value(target, "Name", 3)); // Name was not a value column
+            Assert.Equal("South", Value(target, "Region", 3));
+        }
+
+        [Fact]
+        public void MergeData_with_no_value_columns_inserts_the_missing_keys_only()
+        {
+            string target = CreateCustomers();
+            string source = CreateCustomers();
+            Database.Execute($"INSERT INTO dbo.{target} VALUES (1, N'Contoso', N'West')");
+            Database.Execute($"INSERT INTO dbo.{source} VALUES (1, N'Changed', N'Changed'), (2, N'Fabrikam', N'East')");
+
+            int rows = Db.MergeData(source, target, ["CustomerId"], []);
+
+            Assert.Equal(1, rows);
+            Assert.Equal("Contoso", Value(target, "Name", 1));
+            Assert.Null(Value(target, "Name", 2));
+        }
+
+        [Fact]
+        public async Task BulkMerge_copies_the_rows_and_merges_them_by_key()
+        {
+            string table = CreateCustomers();
+            Database.Execute($"INSERT INTO dbo.{table} VALUES (1, N'Contoso', N'East'), (2, N'Fabrikam', N'East')");
+
+            int rows = Db.BulkMerge(Rows((2, "Fabrikam Ltd"), (3, "Northwind")), "dbo." + table, ["CustomerId"]);
+
+            Assert.Equal(2, rows);
+            Assert.Equal(3, Count(table));
+            Assert.Equal("Contoso", Value(table, "Name", 1));
+            Assert.Equal("Fabrikam Ltd", Value(table, "Name", 2));
+            Assert.Equal("West", Value(table, "Region", 2));
+
+            rows = await Db.BulkMergeAsync(Rows((3, "Northwind Traders")), table, ["[CustomerId]"], deleteUnmatched: true, timeout: 60, batchSize: 1, useTransaction: false);
+
+            Assert.Equal(3, rows); // one matched row updated, two unmatched rows deleted
+            Assert.Equal(1, Count(table));
+            Assert.Equal("Northwind Traders", Value(table, "Name", 3));
+        }
+
+        [Fact]
+        public async Task BulkMerge_matches_columns_by_name_and_leaves_the_others_alone()
+        {
+            string table = CreateCustomers();
+            Database.Execute($"INSERT INTO dbo.{table} VALUES (1, N'Contoso', N'East')");
+            var rows = new DataTable();
+            rows.Columns.Add("Name", typeof(string));
+            rows.Columns.Add("CustomerId", typeof(int));
+            rows.Rows.Add("Contoso Ltd", 1);
+            rows.Rows.Add("Fabrikam", 2);
+
+            Assert.Equal(2, await Db.BulkMergeAsync(rows, table, ["CustomerId"]));
+
+            Assert.Equal("Contoso Ltd", Value(table, "Name", 1));
+            Assert.Equal("East", Value(table, "Region", 1));
+            Assert.Null(Value(table, "Region", 2));
+        }
+
+        [Fact]
+        public void BulkMerge_into_an_identity_table_keys_on_another_column_and_leaves_the_identity_out()
+        {
+            string table = Database.CreateTable("CustomerId int IDENTITY(10, 10) NOT NULL PRIMARY KEY, Name nvarchar(50) NOT NULL UNIQUE, Region nvarchar(20) NULL");
+            Database.Execute($"INSERT INTO dbo.{table} (Name, Region) VALUES (N'Contoso', N'West')");
+            var rows = new DataTable();
+            rows.Columns.Add("Name", typeof(string));
+            rows.Columns.Add("Region", typeof(string));
+            rows.Rows.Add("Contoso", "East");
+            rows.Rows.Add("Fabrikam", "North");
+
+            Assert.Equal(2, Db.BulkMerge(rows, table, ["Name"]));
+
+            Assert.Equal("East", Value(table, "Region", 10));
+            Assert.Equal("Fabrikam", Value(table, "Name", 20));
+
+            // The identity column cannot be carried: SQL Server refuses the merge's insert into it even when every row matches.
+            Assert.ThrowsAny<SqlException>(() => Db.BulkMerge(Rows((10, "Contoso")), table, ["CustomerId"]));
+            Assert.Equal(2, Count(table));
+        }
+
+        [Fact]
+        public async Task A_failed_merge_changes_nothing()
+        {
+            string table = CreateCustomers();
+            Database.Execute($"INSERT INTO dbo.{table} VALUES (1, N'Contoso', N'West')");
+
+            // Two rows with one key: MERGE refuses to update the same row twice.
+            Assert.ThrowsAny<SqlException>(() => Db.BulkMerge(Rows((1, "A"), (1, "B")), table, ["CustomerId"]));
+            await Assert.ThrowsAnyAsync<SqlException>(() => Db.BulkMergeAsync(Rows((1, "A"), (1, "B")), table, ["CustomerId"], useTransaction: false));
+            // A column the table does not have fails before anything is copied.
+            var rows = Rows((1, "A"));
+            rows.Columns.Add("NoSuchColumn", typeof(int));
+            Assert.ThrowsAny<SqlException>(() => Db.BulkMerge(rows, table, ["CustomerId"]));
+
+            Assert.Equal("Contoso", Value(table, "Name", 1));
+            Assert.Equal(1, Count(table));
+        }
+
+        [Fact]
+        public void A_merge_with_bad_arguments_is_refused_before_anything_runs()
+        {
+            string table = CreateCustomers();
+
+            Assert.Throws<ArgumentException>(() => Db.MergeData(table, table, [], ["Name"]));
+            Assert.Throws<ArgumentException>(() => Db.MergeData(table, table, ["CustomerId"], ["Name", "customerid"]));
+            Assert.Throws<ArgumentException>(() => Db.MergeData("[" + table, table, ["CustomerId"], []));
+            Assert.Throws<ArgumentException>(() => Db.BulkMerge(Rows((1, "A")), table, []));
+            Assert.Throws<ArgumentException>(() => Db.BulkMerge(Rows((1, "A")), table, ["NoSuchColumn"]));
+            Assert.Throws<ArgumentException>(() => Db.BulkMerge(new DataTable(), table, ["CustomerId"]));
+            Assert.Throws<ArgumentException>(() => Db.BulkMerge(Rows((1, "A")), "a.b.c.d", ["CustomerId"]));
+
+            Assert.Equal(0, Count(table));
+        }
     }
 }
