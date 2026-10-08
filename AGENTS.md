@@ -39,6 +39,7 @@ SQLServerInteraction is a .NET library of helper methods over
 Microsoft.Data.SqlClient, published to nuget.org as `SQLServerInteraction`
 for net9.0. What an agent working here must not break:
 
+- **The primer.** `AGENT_PRIMER.md` describes every public method, the security model and the breaking changes since 1.x. A change to the public surface updates it in the same pull request.
 - **The release path.** A release starts from a `vX.Y.Z` tag that matches
   `PackageVersion` in `SQLServerInteraction/SQLServerInteraction.csproj`
   (keep `AssemblyVersion` the same); Publish refuses any other. Its notes are
