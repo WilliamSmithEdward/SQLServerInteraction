@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <!-- xUnit1051 asks for TestContext.Current.CancellationToken on every call that takes a token, which is every library call; the tests pass a token where cancellation is what they test. -->
+    <NoWarn>$(NoWarn);xUnit1051</NoWarn>
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>

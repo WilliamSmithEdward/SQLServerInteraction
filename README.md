@@ -8,7 +8,7 @@
 [![OpenSSF Scorecard](https://img.shields.io/ossf-scorecard/github.com/WilliamSmithEdward/SQLServerInteraction?label=openssf%20score)](https://scorecard.dev/viewer/?uri=github.com/WilliamSmithEdward/SQLServerInteraction)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](https://github.com/WilliamSmithEdward/SQLServerInteraction/blob/main/LICENSE)
 
-SQLServerInteraction is a thin layer over Microsoft.Data.SqlClient for .NET 9. A `SQLServerInstance` holds a connection string, and each of its methods opens a connection, runs one piece of work (a query, a command, a bulk copy, a backup, a schema lookup) and closes the connection again; `BeginTransaction` gives an object that runs several of them in one transaction. A separate `QueryBuilder` assembles SELECT statements from strings.
+SQLServerInteraction is a thin layer over Microsoft.Data.SqlClient for .NET 9. A `SQLServerInstance` holds a connection string, and each of its methods opens a connection, runs one piece of work (a query, a command, a bulk copy, a backup, a schema lookup) and closes the connection again; `BeginTransactionAsync` gives an object that runs several of them in one transaction. A separate `QueryBuilder` assembles SELECT statements from strings.
 
 ```
 dotnet add package SQLServerInteraction
@@ -22,7 +22,7 @@ Everything is in the `SQLServerInteraction` namespace.
 
 Values you pass in a parameter dictionary or a `SqlParameter` array are sent as SQL parameters. Table, column, index and database names are quoted as identifiers, so a name is only ever read as a name. Backup paths are sent as parameters.
 
-Some strings are SQL by design and are run as written: the `sql` strings you pass to the query and command methods, the conditions of `UpdateData`, `DeleteData` and `BulkCopy`, and every string `QueryBuilder` takes, table names included. Build them in your own code, and put any value that comes from a user, a file or another system in the parameters instead. The section "Methods that run your SQL", further down, lists them.
+Some strings are SQL by design and are run as written: the `sql` strings you pass to the query and command methods, the conditions of `UpdateDataAsync`, `DeleteDataAsync` and `BulkCopyAsync`, and every string `QueryBuilder` takes, table names included. Build them in your own code, and put any value that comes from a user, a file or another system in the parameters instead. The section "Methods that run your SQL", further down, lists them.
 
 ---
 
@@ -55,7 +55,7 @@ How `GetConnectionString()` builds the string:
 - A null or empty `UserId` gives `Integrated Security=True`, and the password is ignored. Otherwise the string carries `User ID` and `Password`.
 - `additionalParameters` is parsed as a connection string and merged in. Each of its keywords replaces the one the other arguments set, as it did when 1.x appended it to the end, so `"Encrypt=Strict"` there gives strict encryption. Text that is not a valid connection string, or an unknown keyword, throws `ArgumentException`.
 
-Constructing a `SQLServerInstance` does not connect. Each method call opens its own `SqlConnection` and disposes it before returning, so connection pooling is whatever the connection string sets (SqlClient pools by default). Commands use SqlClient's default 30-second command timeout; apart from `BulkCopy` and `BulkMerge`, no method takes a timeout or a `CancellationToken`.
+Constructing a `SQLServerInstance` does not connect. Each method call opens its own `SqlConnection` and disposes it before returning, so connection pooling is whatever the connection string sets (SqlClient pools by default). Commands use SqlClient's default 30-second command timeout; only `BulkCopyAsync` and `BulkMergeAsync` take a timeout. Every method is async and takes an optional `CancellationToken` as its last argument.
 
 Errors are not caught: a server error surfaces as SqlClient's `SqlException`, and a failed connection as whatever `SqlConnection.Open` throws.
 
@@ -72,25 +72,25 @@ using SQLServerInteraction;
 var db = new SQLServerInstance(new SQLServerConnectionString("your-server", "YourDatabase"));
 
 // Every row and column, as a DataTable
-DataTable orders = db.ExecuteQuery("SELECT OrderId, Total FROM dbo.Orders");
+DataTable orders = await db.ExecuteQueryAsync("SELECT OrderId, Total FROM dbo.Orders");
 DataTable ordersAsync = await db.ExecuteQueryAsync("SELECT OrderId, Total FROM dbo.Orders");
 
 // The first column of every row, converted to T
-List<int> ids = db.ExecuteQuery<int>("SELECT OrderId FROM dbo.Orders");
+List<int> ids = await db.ExecuteQueryAsync<int>("SELECT OrderId FROM dbo.Orders");
 List<string> names = await db.ExecuteQueryAsync<string>("SELECT Name FROM dbo.Customers");
 
 // The first column of the first row, converted to T
-int count = db.ExecuteScalar<int>("SELECT COUNT(*) FROM dbo.Orders");
+int count = await db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM dbo.Orders");
 decimal total = await db.ExecuteScalarAsync<decimal>("SELECT SUM(Total) FROM dbo.Orders");
 ```
 
-- `ExecuteQuery<T>` and `ExecuteQueryAsync<T>` read only the first column and convert each value with `Convert.ChangeType`. A nullable type such as `int?` converts to its underlying type, and NULL gives null. Otherwise a NULL becomes `""` for `string` and throws `InvalidCastException` for a value type.
-- `ExecuteScalar<T>` and `ExecuteScalarAsync<T>` return `default(T)` when the query returns no rows or a NULL, and otherwise convert the value with `Convert.ChangeType`. A nullable type converts to its underlying type, so `ExecuteScalar<int?>` returns the number, or null for no rows or NULL.
-- None of these four take parameters. To filter on a value, use `ExecuteQueryToObjectList<T>` below, which does.
+- `ExecuteQueryAsync<T>` reads only the first column and converts each value with `Convert.ChangeType`. A nullable type such as `int?` converts to its underlying type, and NULL gives null. Otherwise a NULL becomes `""` for `string` and throws `InvalidCastException` for a value type.
+- `ExecuteScalarAsync<T>` returns `default(T)` when the query returns no rows or a NULL, and otherwise converts the value with `Convert.ChangeType`. A nullable type converts to its underlying type, so `ExecuteScalar<int?>` returns the number, or null for no rows or NULL.
+- None of these four take parameters. To filter on a value, use `ExecuteQueryToObjectListAsync<T>` below, which does.
 
 ### Mapping rows to objects
 
-`ExecuteQueryToObjectList<T>` and `ExecuteQueryToObjectListAsync<T>` create one `T` per row and set each public property from the column of the same name. `SQLServerInstance.Column` maps a property to a differently named column:
+`ExecuteQueryToObjectListAsync<T>` creates one `T` per row and sets each public property from the column of the same name. `SQLServerInstance.Column` maps a property to a differently named column:
 
 ```csharp
 using SQLServerInteraction;
@@ -111,7 +111,7 @@ using SQLServerInteraction;
 
 var db = new SQLServerInstance(new SQLServerConnectionString("your-server", "YourDatabase"));
 
-List<Customer> customers = db.ExecuteQueryToObjectList<Customer>(
+List<Customer> customers = await db.ExecuteQueryToObjectListAsync<Customer>(
     "SELECT CustomerId, [Customer Name], LastOrder FROM dbo.Customers WHERE Region = @Region",
     new Dictionary<string, object> { ["Region"] = "West" });
 
@@ -134,25 +134,25 @@ using SQLServerInteraction;
 
 var db = new SQLServerInstance(new SQLServerConnectionString("your-server", "YourDatabase"));
 
-db.ExecuteSQL("UPDATE dbo.Orders SET Archived = 1 WHERE OrderDate < '2020-01-01'");
+await db.ExecuteSQLAsync("UPDATE dbo.Orders SET Archived = 1 WHERE OrderDate < '2020-01-01'");
 await db.ExecuteSQLAsync("EXEC dbo.RefreshTotals");
 
 // Dictionary keys are parameter names, with or without the @
-db.ExecuteNonQueryWithParameters(
+await db.ExecuteNonQueryWithParametersAsync(
     "UPDATE dbo.Orders SET Status = @Status WHERE OrderId = @OrderId",
     new Dictionary<string, object> { ["Status"] = "Shipped", ["OrderId"] = 42 });
 
 // SqlParameter objects, for control over type and size
-db.ExecuteParameterizedQuery(
+await db.ExecuteParameterizedQueryAsync(
     "DELETE FROM dbo.Orders WHERE OrderId = @OrderId",
     [new SqlParameter("@OrderId", 42)]);
 
 // A stored procedure by name, with optional parameters
 await db.ExecuteStoredProcedureAsync("dbo.CloseOrder", [new SqlParameter("@OrderId", 42)]);
-db.ExecuteStoredProcedure("dbo.RebuildIndexes");
+await db.ExecuteStoredProcedureAsync("dbo.RebuildIndexes");
 ```
 
-- None of these return the number of rows affected or any result set; use `ExecuteQuery` or `ExecuteScalar<T>` to read data back. `ExecuteParameterizedQuery` runs a command, not a query, despite its name.
+- None of these return the number of rows affected or any result set; use `ExecuteQueryAsync` or `ExecuteScalarAsync<T>` to read data back. `ExecuteParameterizedQueryAsync` runs a command, not a query, despite its name.
 - Every method that takes a parameter dictionary names the parameters the same way: the `@` is added only when the key lacks it, so `"Status"` and `"@Status"` are both `@Status`.
 - A null dictionary value is sent as SQL NULL, as `DBNull.Value` is.
 - The `SqlParameter` methods use the array you pass; a `SqlParameter` can belong to only one command, so build new ones for each call.
@@ -164,39 +164,39 @@ using SQLServerInteraction;
 
 var db = new SQLServerInstance(new SQLServerConnectionString("your-server", "YourDatabase"));
 
-db.ExecuteTransaction([
+await db.ExecuteTransactionAsync([
     "UPDATE dbo.Accounts SET Balance = Balance - 100 WHERE AccountId = 1",
     "UPDATE dbo.Accounts SET Balance = Balance + 100 WHERE AccountId = 2",
 ]);
 ```
 
-`ExecuteTransaction` and `ExecuteTransactionAsync` run the commands in order on one connection inside one transaction. If any command throws, the transaction is rolled back and the exception is rethrown; otherwise it is committed. The commands take no parameters.
+`ExecuteTransactionAsync` runs the commands in order on one connection inside one transaction. If any command throws, the transaction is rolled back and the exception is rethrown; otherwise it is committed. The commands take no parameters.
 
 To run the library's own methods in one transaction, begin one and call them on it:
 
 ```csharp
-using var transaction = db.BeginTransaction();
+await using var transaction = await db.BeginTransactionAsync();
 
-transaction.DeleteData("dbo.Orders", "CustomerId = @Id", new Dictionary<string, object> { ["Id"] = 7 });
-transaction.InsertData("dbo.Orders", new Dictionary<string, object> { ["CustomerId"] = 7, ["Total"] = 10m });
-transaction.BulkCopy(orderLines, "dbo.OrderLines");
-int pending = transaction.ExecuteScalar<int>("SELECT COUNT(*) FROM dbo.Orders WHERE Status = 'Pending'");
+await transaction.DeleteDataAsync("dbo.Orders", "CustomerId = @Id", new Dictionary<string, object> { ["Id"] = 7 });
+await transaction.InsertDataAsync("dbo.Orders", new Dictionary<string, object> { ["CustomerId"] = 7, ["Total"] = 10m });
+await transaction.BulkCopyAsync(orderLines, "dbo.OrderLines");
+int pending = await transaction.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM dbo.Orders WHERE Status = 'Pending'");
 
-transaction.Commit();
+await transaction.CommitAsync();
 
-// The same with the async methods
+// With an isolation level
 await using var work = await db.BeginTransactionAsync(IsolationLevel.Serializable);
 await work.BulkMergeAsync(rows, "dbo.Orders", ["OrderId"]);
 await work.CommitAsync();
 ```
 
-`BeginTransaction` and `BeginTransactionAsync` open one connection, begin a transaction on it, and return a `SQLServerTransaction` that owns both. Each takes an optional `IsolationLevel`; without one, SqlClient's default (read committed) applies. The object has the data methods of `SQLServerInstance` with the same signatures, minus any `useTransaction` parameter: `ExecuteQuery`, `ExecuteQuery<T>`, `ExecuteScalar<T>`, `ExecuteQueryToObjectList<T>`, `ExecuteParameterizedQuery`, `ExecuteSQL`, `ExecuteNonQueryWithParameters`, `ExecuteStoredProcedure`, `InsertData`, `InsertData<T>`, `UpdateData`, `DeleteData`, `MergeData`, `BulkCopy`, `BulkMerge`, `IndexCreate`, `IndexDrop`, and their async versions. A query on it sees the transaction's own uncommitted work.
+`BeginTransactionAsync` opens one connection, begins a transaction on it, and returns a `SQLServerTransaction` that owns both. It takes an optional `IsolationLevel`; without one, SqlClient's default (read committed) applies. The object has the data methods of `SQLServerInstance` with the same signatures, minus any `useTransaction` parameter: `ExecuteQueryAsync`, `ExecuteQueryAsync<T>`, `ExecuteScalarAsync<T>`, `ExecuteQueryToObjectListAsync<T>`, `ExecuteParameterizedQueryAsync`, `ExecuteSQLAsync`, `ExecuteNonQueryWithParametersAsync`, `ExecuteStoredProcedureAsync`, `InsertDataAsync`, `InsertDataAsync<T>`, `UpdateDataAsync`, `DeleteDataAsync`, `MergeDataAsync`, `BulkCopyAsync`, `BulkMergeAsync`, `IndexCreateAsync` and `IndexDropAsync`. A query on it sees the transaction's own uncommitted work.
 
-- `Commit` (or `CommitAsync`) commits. `Rollback` rolls back early. Disposing the object without a commit rolls back, so a `using` block is enough: an exception in the middle leaves the database as it was.
-- After an exception from any method, roll back, or let the `using` block do it. Do not catch the exception and carry on to `Commit`: for some errors, such as a constraint violation, SQL Server fails only that statement and leaves the transaction open, so the commit would keep the work done before the failure.
-- To undo part of a transaction on purpose, mark a savepoint with `Save(name)` and return to it with `RollbackTo(name)`; the transaction stays open and can still be committed. A name is one identifier of up to 32 characters, and marking it again moves it. Both have async versions. Rolling back to a savepoint works after an error that failed one statement, such as a constraint violation, but not after one that made the transaction uncommittable, such as a deadlock: SQL Server refuses it, and only a full rollback is left.
-- If `Commit` itself throws, for example because the connection dropped, the object cannot be used again and says so; dispose it, and whatever the server did not commit is rolled back.
-- Every async method on it takes an optional `CancellationToken` as its last argument, as do `BeginTransactionAsync`, `CommitAsync` and `RollbackAsync`. A cancelled call throws `OperationCanceledException` and the transaction can still be rolled back. The methods on `SQLServerInstance` itself take no token.
+- `CommitAsync` commits. `RollbackAsync` rolls back early. Disposing the object without a commit rolls back, so an `await using` block is enough: an exception in the middle leaves the database as it was.
+- After an exception from any method, roll back, or let the `using` block do it. Do not catch the exception and carry on to `CommitAsync`: for some errors, such as a constraint violation, SQL Server fails only that statement and leaves the transaction open, so the commit would keep the work done before the failure.
+- To undo part of a transaction on purpose, mark a savepoint with `SaveAsync(name)` and return to it with `RollbackToAsync(name)`; the transaction stays open and can still be committed. A name is one identifier of up to 32 characters, and marking it again moves it. Rolling back to a savepoint works after an error that failed one statement, such as a constraint violation, but not after one that made the transaction uncommittable, such as a deadlock: SQL Server refuses it, and only a full rollback is left.
+- If `CommitAsync` itself throws, for example because the connection dropped, the object cannot be used again and says so; dispose it, and whatever the server did not commit is rolled back.
+- Every method takes an optional `CancellationToken` as its last argument, on the transaction and on `SQLServerInstance` alike. A cancelled call throws `OperationCanceledException` and the transaction can still be rolled back.
 - After a commit, rollback or dispose, every method throws `InvalidOperationException` (or `ObjectDisposedException`), so a transaction cannot be reused by mistake.
 - The object is not thread-safe. Use it from one thread, or one async flow, at a time, and dispose it promptly: it holds a pooled connection and the transaction's locks until then.
 - Backup, restore, CSV export, the schema lookups and `ExecuteScriptFromFileAsync` are not on it. Each of those still opens its own connection.
@@ -211,7 +211,7 @@ var db = new SQLServerInstance(new SQLServerConnectionString("your-server", "You
 await db.ExecuteScriptFromFileAsync(@"C:\scripts\create-tables.sql");
 ```
 
-The whole file is read and sent as a single batch. `GO` is a separator understood by SQL Server tools, not by the server, so a script that uses it fails; split such a script and run each part with `ExecuteSQL`. There is no synchronous version.
+The whole file is read and sent as a single batch. `GO` is a separator understood by SQL Server tools, not by the server, so a script that uses it fails; split such a script and run each part with `ExecuteSQLAsync`.
 
 ---
 
@@ -223,7 +223,7 @@ using SQLServerInteraction;
 var db = new SQLServerInstance(new SQLServerConnectionString("your-server", "YourDatabase"));
 
 // Column name -> value
-db.InsertData("dbo.Customers", new Dictionary<string, object>
+await db.InsertDataAsync("dbo.Customers", new Dictionary<string, object>
 {
     ["CustomerId"] = 7,
     ["Customer Name"] = "Contoso",
@@ -231,12 +231,12 @@ db.InsertData("dbo.Customers", new Dictionary<string, object>
 });
 
 // The condition is SQL; its values go in the last argument
-db.UpdateData("dbo.Customers",
+await db.UpdateDataAsync("dbo.Customers",
     new Dictionary<string, object> { ["Customer Name"] = "Contoso Ltd" },
     "CustomerId = @Id",
     new Dictionary<string, object> { ["Id"] = 7 });
 
-db.DeleteData("dbo.Customers", "CustomerId = @Id", new Dictionary<string, object> { ["Id"] = 7 });
+await db.DeleteDataAsync("dbo.Customers", "CustomerId = @Id", new Dictionary<string, object> { ["Id"] = 7 });
 
 // One object -> one row
 await db.InsertDataAsync(new Customer { CustomerId = 8, Name = "Fabrikam" }, "dbo.Customers");
@@ -245,9 +245,9 @@ await db.InsertDataAsync(new Customer { CustomerId = 8, Name = "Fabrikam" }, "db
 - Table names can have one, two or three parts (`Customers`, `dbo.Customers`, `MyDb.dbo.Customers`), each plain or in brackets (`[dbo].[My Customers]`). Every part is quoted, so a name with a space or any other character works and cannot change the SQL. A malformed name (an empty part, an unclosed bracket, more than three parts, a part over 128 characters) throws `ArgumentException`.
 - Each dictionary key is one column name, plain or bracketed (`Customer Name` or `[Customer Name]`), and is quoted the same way. Bracket a column name that contains a dot. The values are sent as parameters named `@__value_0`, `@__value_1` and so on, so do not give condition parameters those names.
 - A null value is sent as NULL, as `DBNull.Value` is.
-- `UpdateData` and `DeleteData` take the condition as SQL text without the `WHERE` keyword, run as written. An overload of each (and of the async versions) takes a dictionary of parameters for the condition as its last argument. Parameter names work with or without the `@`, and null is sent as NULL.
+- `UpdateDataAsync` and `DeleteDataAsync` take the condition as SQL text without the `WHERE` keyword, run as written. An overload of each takes a dictionary of parameters for the condition as its last argument. Parameter names work with or without the `@`, and null is sent as NULL.
 - The condition is required. An empty or whitespace condition throws `ArgumentException` instead of affecting every row; to update or delete every row, pass `"1 = 1"`.
-- `InsertData<T>` and `InsertDataAsync<T>` insert one row with a column for every public instance property of `T` that has a getter, named by its `SQLServerInstance.Column` attribute or else by the property, so the example above writes to `Customer Name`. Static properties and indexers are left out. A null property value is sent as NULL. Include only properties that have columns; an identity column fails unless `IDENTITY_INSERT` is on.
+- `InsertDataAsync<T>` inserts one row with a column for every public instance property of `T` that has a getter, named by its `SQLServerInstance.Column` attribute or else by the property, so the example above writes to `Customer Name`. Static properties and indexers are left out. A null property value is sent as NULL. Include only properties that have columns; an identity column fails unless `IDENTITY_INSERT` is on.
 - None of these return the number of rows affected.
 
 ### Bulk copy
@@ -265,7 +265,7 @@ table.Rows.Add(1, 19.99m);
 table.Rows.Add(2, 5.00m);
 
 // Append the rows
-db.BulkCopy(table, "dbo.Orders");
+await db.BulkCopyAsync(table, "dbo.Orders");
 
 // Delete the rows matching the condition first, then copy, in one transaction
 await db.BulkCopyAsync(table, "dbo.Orders",
@@ -281,11 +281,11 @@ source.Columns.Add("Code", typeof(int));
 source.Columns.Add("Amount", typeof(decimal));
 source.Rows.Add(3, 12.50m);
 
-db.BulkCopy(source, "dbo.Orders", flushTable: false, flushWhereClauseCondition: null, flushParameters: null,
+await db.BulkCopyAsync(source, "dbo.Orders", flushTable: false, flushWhereClauseCondition: null, flushParameters: null,
     columnMappings: new Dictionary<string, string> { ["Code"] = "OrderId", ["Amount"] = "Total" });
 ```
 
-`BulkCopy` and `BulkCopyAsync` write the rows with `SqlBulkCopy`. Without `columnMappings`, columns map by position, not by name, so the DataTable's columns must be in the destination table's order. The table name is quoted as described above, for the `DELETE` and for `SqlBulkCopy`.
+`BulkCopyAsync` writes the rows with `SqlBulkCopy`. Without `columnMappings`, columns map by position, not by name, so the DataTable's columns must be in the destination table's order. The table name is quoted as described above, for the `DELETE` and for `SqlBulkCopy`.
 
 | Parameter | Default | Effect |
 |---|---|---|
@@ -306,7 +306,7 @@ using SQLServerInteraction;
 var db = new SQLServerInstance(new SQLServerConnectionString("your-server", "YourDatabase"));
 
 // Table to table: update the orders whose OrderId is in Staging, insert the rest
-int affected = db.MergeData("dbo.Orders_Staging", "dbo.Orders",
+int affected = await db.MergeDataAsync("dbo.Orders_Staging", "dbo.Orders",
     keyColumns: ["OrderId"],
     valueColumns: ["Total", "Status"]);
 
@@ -324,18 +324,18 @@ rows.Rows.Add(3, 12.50m);
 affected = await db.BulkMergeAsync(rows, "dbo.Orders", keyColumns: ["OrderId"], timeout: 120);
 ```
 
-`MergeData` runs one `MERGE` statement from the source table into the target: a target row whose key columns all equal a source row's is updated in the value columns, a source row with no match is inserted with its keys and values, and, with `deleteUnmatched`, a target row with no match is deleted. `BulkMerge` does the same for a DataTable: it creates a temporary table shaped like the destination's columns, bulk copies the rows into it, and merges from there, matching each DataTable column to the destination column of the same name, so the columns can be in any order. Every column the DataTable has that is not a key is a value column; a column the DataTable does not have is left alone on an update and takes its default on an insert.
+`MergeDataAsync` runs one `MERGE` statement from the source table into the target: a target row whose key columns all equal a source row's is updated in the value columns, a source row with no match is inserted with its keys and values, and, with `deleteUnmatched`, a target row with no match is deleted. `BulkMergeAsync` does the same for a DataTable: it creates a temporary table shaped like the destination's columns, bulk copies the rows into it, and merges from there, matching each DataTable column to the destination column of the same name, so the columns can be in any order. Every column the DataTable has that is not a key is a value column; a column the DataTable does not have is left alone on an update and takes its default on an insert.
 
 Both return the number of rows inserted, updated and deleted. Every table and column name is quoted as described under "Inserting, updating and deleting"; nothing in these methods is run as SQL you wrote.
 
 | Parameter | Default | Effect |
 |---|---|---|
 | `keyColumns` | required | The columns that identify a row. A NULL key never matches, so such a row is inserted on every merge. Two source rows with the same key fail the merge, and so does an empty list, before anything runs. |
-| `valueColumns` | required (`MergeData` only) | The columns to set on a matched row and to insert with the keys on a new one. Empty inserts the missing keys and leaves matched rows alone. A column in both lists throws `ArgumentException`. |
+| `valueColumns` | required (`MergeDataAsync` only) | The columns to set on a matched row and to insert with the keys on a new one. Empty inserts the missing keys and leaves matched rows alone. A column in both lists throws `ArgumentException`. |
 | `deleteUnmatched` | `false` | Also delete every target row that matches no source row. |
-| `timeout` | `30` (`BulkMerge` only) | Seconds the copy may take, and then seconds the merge may take. |
-| `batchSize` | `null` (`BulkMerge` only) | Rows per batch sent to the temporary table. |
-| `useTransaction` | `true` | `BulkMerge`: run the copy and the merge in one transaction, rolled back if either fails. `MergeData`: hold the merge's locks until the transaction commits. A `MERGE` statement is atomic on its own, so with `false` a failure still leaves the target as it was. |
+| `timeout` | `30` (`BulkMergeAsync` only) | Seconds the copy may take, and then seconds the merge may take. |
+| `batchSize` | `null` (`BulkMergeAsync` only) | Rows per batch sent to the temporary table. |
+| `useTransaction` | `true` | `BulkMergeAsync`: run the copy and the merge in one transaction, rolled back if either fails. `MergeDataAsync`: hold the merge's locks until the transaction commits. A `MERGE` statement is atomic on its own, so with `false` a failure still leaves the target as it was. |
 
 Leave an identity column out of the value columns and the DataTable: the merge inserts every column it carries, and SQL Server refuses to insert into an identity column even when no row is new. Key on another column instead.
 
@@ -351,7 +351,7 @@ var db = new SQLServerInstance(new SQLServerConnectionString("your-server", "You
 await db.ExportDataToCSVAsync(@"C:\exports\orders.csv", "SELECT OrderId, Total FROM dbo.Orders");
 ```
 
-The file is created or overwritten, in UTF-8 without a byte order mark. The first line holds the column names, joined with commas and not quoted. Each data row has every value in double quotes, with embedded quotes doubled; a NULL is written as `""`. Values are formatted with the current culture, so dates and decimals follow the machine's regional settings. There is no synchronous version.
+The file is created or overwritten, in UTF-8 without a byte order mark. The first line holds the column names, joined with commas and not quoted. Each data row has every value in double quotes, with embedded quotes doubled; a NULL is written as `""`. Values are formatted with the current culture, so dates and decimals follow the machine's regional settings.
 
 ---
 
@@ -362,15 +362,15 @@ using SQLServerInteraction;
 
 var db = new SQLServerInstance(new SQLServerConnectionString("your-server", "YourDatabase"));
 
-db.BackupDatabase(@"D:\Backups\YourDatabase.bak");
-DateTime? last = db.GetLastBackupDateTime();
+await db.BackupDatabaseAsync(@"D:\Backups\YourDatabase.bak");
+DateTime? last = await db.GetLastBackupDateTimeAsync();
 await db.RestoreDatabaseAsync(@"D:\Backups\YourDatabase.bak");
 ```
 
 - Both act on the database named in the connection string. The path is a path on the SQL Server machine, not on the machine running your code, and the server's service account needs access to it.
-- `BackupDatabase` runs `BACKUP DATABASE @database TO DISK = @path` with no options, the name and path sent as parameters, so a second backup to the same file is appended to it.
-- `RestoreDatabase` switches its connection to `master`, then runs `RESTORE DATABASE @database FROM DISK = @path` with no options (no `REPLACE`, no `MOVE`). It fails if any other connection is using the database, and idle pooled connections from this process count: call `SqlConnection.ClearAllPools()` first.
-- `GetLastBackupDateTime` returns the latest `backup_finish_date` in `msdb.dbo.backupset` for the current database, or null if there is none. It needs read access to msdb.
+- `BackupDatabaseAsync` runs `BACKUP DATABASE @database TO DISK = @path` with no options, the name and path sent as parameters, so a second backup to the same file is appended to it.
+- `RestoreDatabaseAsync` switches its connection to `master`, then runs `RESTORE DATABASE @database FROM DISK = @path` with no options (no `REPLACE`, no `MOVE`). It fails if any other connection is using the database, and idle pooled connections from this process count: call `SqlConnection.ClearAllPools()` first.
+- `GetLastBackupDateTimeAsync` returns the latest `backup_finish_date` in `msdb.dbo.backupset` for the current database, or null if there is none. It needs read access to msdb.
 
 ---
 
@@ -378,24 +378,24 @@ await db.RestoreDatabaseAsync(@"D:\Backups\YourDatabase.bak");
 
 | Method | Returns |
 |---|---|
-| `DoesDatabaseExist(databaseName)` | `true` if a database of that name exists on the server, ignoring case. |
-| `DoesTableExist(tableName)` | `true` if a table or view with that name exists (`INFORMATION_SCHEMA.TABLES`). |
-| `GetTableNames()` | The names of all tables and views in the database, without schema names. |
-| `GetColumnNames(tableName)` | The column names of every table or view with that name. |
-| `GetTableColumns(tableName)` | Column name to data type name (`int`, `nvarchar`, ...), from `INFORMATION_SCHEMA.COLUMNS`, in column order. |
-| `GetTableSchema(tableName)` | An empty `DataTable` with the table's columns, types and key, from `SqlDataAdapter.FillSchema`. |
-| `GetTablePrimaryKeyColumn(tableName)` | The first column of the primary key in key order, or null. For a composite key, only that one. |
-| `GetTablePrimaryKeyColumns(tableName)` | Every column of the primary key, in key order, or an empty list. |
-| `GetTableIndexs(tableName)` | The names of the table's non-clustered indexes that are not the primary key. Clustered indexes are not listed. |
-| `GetTableRowCount(tableName)` | `SELECT COUNT(*)` for the table, as an `int`. |
-| `GetStoredProcedures()` | The names of all stored procedures and functions (`INFORMATION_SCHEMA.ROUTINES`), without schema names. |
-| `GetStoredProcedureParameters(storedProcedureName)` | The procedure's parameter names, with their `@`, from `SqlCommandBuilder.DeriveParameters`. The return value is left out. |
-| `GetDatabaseInformation()` | A dictionary with `DatabaseName`, `DatabaseId`, `CreationDate` (formatted with the current culture) and `Collation`. |
-| `GetDatabaseSizeInBytes()` | The total size of the database's data and log files in bytes (`SUM(size) * 8192` from `sys.master_files`, where `size` counts 8 KB pages). Before 2.0.0 it returned kilobytes. Needs permission to read `sys.master_files`. |
-| `IndexCreate(tableName, columnName)` | Nothing. Runs `CREATE INDEX [IX_<column>] ON <table> ([<column>])`. |
-| `IndexDrop(tableName, indexName)` | Nothing. Runs `DROP INDEX [<index>] ON <table>`. |
+| `DoesDatabaseExistAsync(databaseName)` | `true` if a database of that name exists on the server, ignoring case. |
+| `DoesTableExistAsync(tableName)` | `true` if a table or view with that name exists (`INFORMATION_SCHEMA.TABLES`). |
+| `GetTableNamesAsync()` | The names of all tables and views in the database, without schema names. |
+| `GetColumnNamesAsync(tableName)` | The column names of every table or view with that name. |
+| `GetTableColumnsAsync(tableName)` | Column name to data type name (`int`, `nvarchar`, ...), from `INFORMATION_SCHEMA.COLUMNS`, in column order. |
+| `GetTableSchemaAsync(tableName)` | An empty `DataTable` with the table's columns, types and key, from `SqlDataAdapter.FillSchema`. |
+| `GetTablePrimaryKeyColumnAsync(tableName)` | The first column of the primary key in key order, or null. For a composite key, only that one. |
+| `GetTablePrimaryKeyColumnsAsync(tableName)` | Every column of the primary key, in key order, or an empty list. |
+| `GetTableIndexesAsync(tableName)` | The names of the table's non-clustered indexes that are not the primary key. Clustered indexes are not listed. |
+| `GetTableRowCountAsync(tableName)` | `SELECT COUNT(*)` for the table, as an `int`. |
+| `GetStoredProceduresAsync()` | The names of all stored procedures and functions (`INFORMATION_SCHEMA.ROUTINES`), without schema names. |
+| `GetStoredProcedureParametersAsync(storedProcedureName)` | The procedure's parameter names, with their `@`, from `SqlCommandBuilder.DeriveParameters`. The return value is left out. |
+| `GetDatabaseInformationAsync()` | A dictionary with `DatabaseName`, `DatabaseId`, `CreationDate` (formatted with the current culture) and `Collation`. |
+| `GetDatabaseSizeInBytesAsync()` | The total size of the database's data and log files in bytes (`SUM(size) * 8192` from `sys.master_files`, where `size` counts 8 KB pages). Before 2.0.0 it returned kilobytes. Needs permission to read `sys.master_files`. |
+| `IndexCreateAsync(tableName, columnName)` | Nothing. Runs `CREATE INDEX [IX_<column>] ON <table> ([<column>])`. |
+| `IndexDropAsync(tableName, indexName)` | Nothing. Runs `DROP INDEX [<index>] ON <table>`. |
 
-Every table name takes the forms described under "Inserting, updating and deleting": one to three parts, plain or bracketed. `GetTableSchema`, `GetTableRowCount`, `IndexCreate` and `IndexDrop` quote it into the SQL, and `GetTableIndexs` passes the quoted name to `OBJECT_ID` as a parameter, so a bare name there means the default schema. `DoesTableExist`, `GetColumnNames`, `GetTableColumns`, `GetTablePrimaryKeyColumn` and `GetTablePrimaryKeyColumns` compare the parts with the catalog as parameters: a bare name (`Orders`) matches a table of that name in any schema, and `dbo.Orders` matches only the one in `dbo`.
+Every table name takes the forms described under "Inserting, updating and deleting": one to three parts, plain or bracketed. `GetTableSchemaAsync`, `GetTableRowCountAsync`, `IndexCreateAsync` and `IndexDropAsync` quote it into the SQL, and `GetTableIndexesAsync` passes the quoted name to `OBJECT_ID` as a parameter, so a bare name there means the default schema. `DoesTableExistAsync`, `GetColumnNamesAsync`, `GetTableColumnsAsync`, `GetTablePrimaryKeyColumnAsync` and `GetTablePrimaryKeyColumnsAsync` compare the parts with the catalog as parameters: a bare name (`Orders`) matches a table of that name in any schema, and `dbo.Orders` matches only the one in `dbo`.
 
 ---
 
@@ -403,15 +403,15 @@ Every table name takes the forms described under "Inserting, updating and deleti
 
 These methods run SQL text you write. Treat every string listed here as code: build it in your own code, and send anything else as a parameter.
 
-| Method (and its async version) | SQL run as written |
+| Method | SQL run as written |
 |---|---|
-| `ExecuteQuery`, `ExecuteQuery<T>`, `ExecuteScalar<T>`, `ExecuteSQL`, `ExecuteTransaction`, `ExportDataToCSVAsync`, `ExecuteScriptFromFileAsync` (file contents) | the SQL itself |
-| `ExecuteNonQueryWithParameters`, `ExecuteParameterizedQuery`, `ExecuteQueryToObjectList<T>` | the SQL itself; values go as parameters |
-| `UpdateData`, `DeleteData` | the condition; its values can go in the parameters dictionary their overloads take |
-| `BulkCopy` | `flushWhereClauseCondition`; its values can go in `flushParameters` |
+| `ExecuteQueryAsync`, `ExecuteQueryAsync<T>`, `ExecuteScalarAsync<T>`, `ExecuteSQLAsync`, `ExecuteTransactionAsync`, `ExportDataToCSVAsync`, `ExecuteScriptFromFileAsync` (file contents) | the SQL itself |
+| `ExecuteNonQueryWithParametersAsync`, `ExecuteParameterizedQueryAsync`, `ExecuteQueryToObjectListAsync<T>` | the SQL itself; values go as parameters |
+| `UpdateDataAsync`, `DeleteDataAsync` | the condition; its values can go in the parameters dictionary their overloads take |
+| `BulkCopyAsync` | `flushWhereClauseCondition`; its values can go in `flushParameters` |
 | `QueryBuilder` (every method) | every string |
 
-`ExecuteStoredProcedure` and `GetStoredProcedureParameters` send the procedure name to SqlClient as a procedure name (`CommandType.StoredProcedure`), not as a batch. Every other name the library takes, of a table, column, index or database, is quoted or sent as a parameter.
+`ExecuteStoredProcedureAsync` and `GetStoredProcedureParametersAsync` send the procedure name to SqlClient as a procedure name (`CommandType.StoredProcedure`), not as a batch. Every other name the library takes, of a table, column, index or database, is quoted or sent as a parameter.
 
 ---
 
@@ -446,7 +446,7 @@ Console.WriteLine(result.Parameters);
 // @Region, @Since
 
 // The values go with the SQL to any method that takes a parameter dictionary
-List<Customer> page = db.ExecuteQueryToObjectList<Customer>(result.SQL!, result.ParameterValues);
+List<Customer> page = await db.ExecuteQueryToObjectListAsync<Customer>(result.SQL!, result.ParameterValues);
 ```
 
 ```csharp

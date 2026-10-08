@@ -41,7 +41,7 @@
 	<Title>SQLServerInteraction</Title>
 	<Authors>WilliamSmithE</Authors>
 	<Copyright>William Smith (WilliamSmithE)</Copyright>
-	<Description>Helper methods over Microsoft.Data.SqlClient for SQL Server: queries into DataTables, scalars and mapped objects, parameterized commands, transactions, bulk copy, merge, insert, update and delete from dictionaries, CSV export, backup and restore, and schema lookups. The data methods have async versions. Values are sent as parameters and table, column and index names are quoted as identifiers.</Description>
+	<Description>Helper methods over Microsoft.Data.SqlClient for SQL Server: queries into DataTables, scalars and mapped objects, parameterized commands, transactions, bulk copy, merge, insert, update and delete from dictionaries, CSV export, backup and restore, and schema lookups. Every method is async and takes a cancellation token, and several run together in one transaction. Values are sent as parameters and table, column and index names are quoted as identifiers.</Description>
 	<PackageProjectUrl>https://github.com/WilliamSmithEdward/SQLServerInteraction</PackageProjectUrl>
 	<RepositoryUrl>https://github.com/WilliamSmithEdward/SQLServerInteraction</RepositoryUrl>
 	<RepositoryType>git</RepositoryType>

@@ -1,24 +1,18 @@
-﻿using Microsoft.Data.SqlClient;
-
 namespace SQLServerInteraction
 {
     public partial class SQLServerInstance
     {
         /// <summary>
-        /// Retrieves the row count of a table in the SQL Server database.
+        /// The number of rows in a table, from <c>SELECT COUNT(*)</c>.
         /// </summary>
         /// <param name="tableName">The name of the table, such as <c>Sales</c>, <c>dbo.Sales</c> or <c>[dbo].[My Sales]</c>. It is quoted as an identifier.</param>
-        /// <returns>The number of rows in the specified table.</returns>
+        /// <param name="cancellationToken">A token to cancel the operation.</param>
+        /// <returns>A task whose result is the row count.</returns>
         /// <exception cref="ArgumentException">The name is not a valid one-, two- or three-part name.</exception>
-        public int GetTableRowCount(string tableName)
+        public async Task<int> GetTableRowCountAsync(string tableName, CancellationToken cancellationToken = default)
         {
             string sql = $"SELECT COUNT(*) FROM {SqlIdentifier.Quote(tableName)}";
-
-            using var connection = new SqlConnection(_connectionString);
-            connection.Open();
-
-            using var command = new SqlCommand(sql, connection);
-            return Convert.ToInt32(command.ExecuteScalar());
+            return Convert.ToInt32(await CatalogScalarAsync(sql, null, cancellationToken));
         }
     }
 }

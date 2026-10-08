@@ -59,20 +59,20 @@ namespace SQLServerInteraction.Tests
         private static string BackupPath() => $"/var/opt/mssql/data/it's {Guid.NewGuid():N}.bak";
 
         [Fact]
-        public void BackupDatabase_and_RestoreDatabase_take_any_database_name_and_path()
+        public async Task BackupDatabase_and_RestoreDatabase_take_any_database_name_and_path()
         {
             var db = new SQLServerInstance(ConnectionString);
             string path = BackupPath();
 
-            Assert.Null(db.GetLastBackupDateTime());
-            db.BackupDatabase(path);
-            Assert.NotNull(db.GetLastBackupDateTime());
+            Assert.Null(await db.GetLastBackupDateTimeAsync());
+            await db.BackupDatabaseAsync(path);
+            Assert.NotNull(await db.GetLastBackupDateTimeAsync());
 
             Execute("DROP TABLE dbo.Kept");
             Assert.Equal(-1, KeptRows());
 
             SqlConnection.ClearAllPools();
-            db.RestoreDatabase(path);
+            await db.RestoreDatabaseAsync(path);
 
             Assert.Equal(2, KeptRows());
         }

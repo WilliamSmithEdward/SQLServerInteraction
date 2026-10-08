@@ -1,58 +1,34 @@
-﻿using Microsoft.Data.SqlClient;
-using System.Data;
+using Microsoft.Data.SqlClient;
 using System.Text;
-using System.Text.Json;
 
 namespace SQLServerInteraction
 {
     public partial class SQLServerInstance
     {
         /// <summary>
-        /// Asynchronously exports data from a SQL query to a CSV file.
+        /// Runs a query and writes its result set to a CSV file, created or overwritten, in UTF-8 without a byte order mark. The first line holds the column names, unquoted; each data value is written in double quotes with embedded quotes doubled, NULL as <c>""</c>, and formatted with the current culture.
         /// </summary>
-        /// <param name="destinationFilePath">The file path where the CSV data will be saved.</param>
-        /// <param name="sql">The SQL query to retrieve data for export.</param>
+        /// <param name="destinationFilePath">The path of the file to write.</param>
+        /// <param name="sql">The SQL query to execute.</param>
+        /// <param name="cancellationToken">A token to cancel the operation.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
-        public async Task ExportDataToCSVAsync(string destinationFilePath, string sql)
-        {
-            using var connection = new SqlConnection(_connectionString);
-            await connection.OpenAsync();
-
-            using var command = new SqlCommand(sql, connection);
-            using var reader = await command.ExecuteReaderAsync();
-
-            var columnNames = GetColumnNames(reader);
-
-            using var writer = new StreamWriter(destinationFilePath);
-
-            await writer.WriteLineAsync(string.Join(",", columnNames));
-
-            while (await reader.ReadAsync())
+        public Task ExportDataToCSVAsync(string destinationFilePath, string sql, CancellationToken cancellationToken = default) =>
+            WithConnectionAsync(async connection =>
             {
+                using var command = new SqlCommand(sql, connection);
+                using var reader = await command.ExecuteReaderAsync(cancellationToken);
+                using var writer = new StreamWriter(destinationFilePath);
+
+                await writer.WriteLineAsync(string.Join(",", Enumerable.Range(0, reader.FieldCount).Select(reader.GetName)));
+
                 var record = new object[reader.FieldCount];
-
-                reader.GetValues(record);
-
-                var sb = new StringBuilder();
-
-                foreach (var field in record)
+                while (await reader.ReadAsync(cancellationToken))
                 {
-                    sb.Append("\"" + field?.ToString()?.Replace("\"", "\"\"") + "\",");
-
+                    reader.GetValues(record);
+                    await writer.WriteLineAsync(string.Join(",", record.Select(field => "\"" + field?.ToString()?.Replace("\"", "\"\"") + "\"")));
                 }
 
-                await writer.WriteLineAsync(sb.ToString().TrimEnd(','));
-            }
-        }
-
-        private static string[] GetColumnNames(SqlDataReader reader)
-        {
-            var columnNames = new string[reader.FieldCount];
-            for (int i = 0; i < reader.FieldCount; i++)
-            {
-                columnNames[i] = reader.GetName(i);
-            }
-            return columnNames;
-        }
+                return true;
+            }, cancellationToken);
     }
 }
