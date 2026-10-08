@@ -1,4 +1,4 @@
-﻿using Microsoft.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 
 namespace SQLServerInteraction
 {
@@ -24,12 +24,29 @@ namespace SQLServerInteraction
         /// <exception cref="ArgumentException">The table name is not a valid name, or <paramref name="condition"/> is empty or whitespace.</exception>
         public void DeleteData(string sqlServerTableName, string condition, Dictionary<string, object>? parameters)
         {
-            string sql = $"DELETE FROM {SqlIdentifier.Quote(sqlServerTableName)} WHERE {RequireCondition(condition, nameof(condition))}";
+            using var work = Connect();
+            work.DeleteData(sqlServerTableName, condition, parameters);
+        }
 
-            using var connection = new SqlConnection(_connectionString);
-            connection.Open();
+        /// <summary><c>DELETE FROM [table] WHERE condition</c>, with the name quoted and the condition as written.</summary>
+        internal static string DeleteSql(string tableName, string condition) =>
+            $"DELETE FROM {SqlIdentifier.Quote(tableName)} WHERE {RequireCondition(condition, nameof(condition))}";
+    }
 
-            using var command = new SqlCommand(sql, connection);
+    public partial class SQLServerTransaction
+    {
+        /// <inheritdoc cref="SQLServerInstance.DeleteData(string, string)"/>
+        public void DeleteData(string sqlServerTableName, string condition = "")
+        {
+            DeleteData(sqlServerTableName, condition, null);
+        }
+
+        /// <inheritdoc cref="SQLServerInstance.DeleteData(string, string, Dictionary{string, object}?)"/>
+        public void DeleteData(string sqlServerTableName, string condition, Dictionary<string, object>? parameters)
+        {
+            string sql = SQLServerInstance.DeleteSql(sqlServerTableName, condition);
+
+            using var command = new SqlCommand(sql, _connection, Transaction);
             CommandParameters.Add(command, parameters);
             command.ExecuteNonQuery();
         }

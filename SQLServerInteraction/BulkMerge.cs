@@ -16,56 +16,20 @@ namespace SQLServerInteraction
         /// <param name="batchSize">Instructs the bulk copy operation to split the data into chunks when transferring. Defaults to no batching.</param>
         /// <param name="useTransaction">A flag indicating whether to run the copy and the merge in one transaction, rolled back if either fails. Defaults to true. Without it, the merge statement is still atomic, but its locks are released as soon as it finishes.</param>
         /// <returns>The number of destination rows inserted, updated and deleted.</returns>
-        /// <exception cref="ArgumentException">The table name or a key column is not a valid name, the DataTable has no columns, there are no key columns, or a key column is not a column of the DataTable. Each is checked before a connection is opened.</exception>
+        /// <exception cref="ArgumentException">The table name or a key column is not a valid name, the DataTable has no columns, there are no key columns, or a key column is not a column of the DataTable. Each is checked before anything runs.</exception>
         public int BulkMerge(DataTable dataTable, string destinationTableName, IEnumerable<string> keyColumns, bool deleteUnmatched = false, int timeout = 30, int? batchSize = null, bool useTransaction = true)
         {
-            var (stagingSql, mergeSql) = BulkMergeSql(dataTable, destinationTableName, keyColumns, deleteUnmatched);
-
-            using var connection = new SqlConnection(_connectionString);
-            connection.Open();
-
-            SqlTransaction? transaction = useTransaction ? connection.BeginTransaction() : null;
-
-            try
-            {
-                using (var staging = new SqlCommand(stagingSql, connection, transaction))
-                {
-                    staging.ExecuteNonQuery();
-                }
-
-                using (var bulkCopy = new SqlBulkCopy(connection, SqlBulkCopyOptions.Default, transaction))
-                {
-                    bulkCopy.BulkCopyTimeout = timeout;
-                    if (batchSize.HasValue) bulkCopy.BatchSize = batchSize.Value;
-                    bulkCopy.DestinationTableName = BulkMergeStagingTable;
-                    bulkCopy.WriteToServer(dataTable);
-                }
-
-                using var merge = new SqlCommand(mergeSql, connection, transaction);
-                merge.CommandTimeout = timeout;
-                int rows = merge.ExecuteNonQuery();
-
-                transaction?.Commit();
-                return rows;
-            }
-
-            catch
-            {
-                transaction?.Rollback();
-                throw;
-            }
-
-            finally
-            {
-                transaction?.Dispose();
-            }
+            using var work = useTransaction ? BeginTransaction() : Connect();
+            int rows = work.BulkMerge(dataTable, destinationTableName, keyColumns, deleteUnmatched, timeout, batchSize);
+            if (useTransaction) work.Commit();
+            return rows;
         }
 
         /// <summary>
         /// The temporary table the DataTable is copied into, which lives only in the
         /// connection that creates it and goes when the connection closes.
         /// </summary>
-        private const string BulkMergeStagingTable = "[#SQLServerInteraction_BulkMerge]";
+        internal const string BulkMergeStagingTable = "[#SQLServerInteraction_BulkMerge]";
 
         /// <summary>
         /// The two statements of a bulk merge, checked before anything runs: the
@@ -96,6 +60,35 @@ namespace SQLServerInteraction
             string staging = $"SELECT TOP (0) {string.Join(", ", columns.Select(SqlIdentifier.QuotePart))} INTO {BulkMergeStagingTable} FROM {target}";
             string merge = MergeSql(BulkMergeStagingTable, target, keys.Select(SqlIdentifier.QuotePart).ToList(), values.Select(SqlIdentifier.QuotePart).ToList(), deleteUnmatched);
             return (staging, merge);
+        }
+    }
+
+    public partial class SQLServerTransaction
+    {
+        /// <summary>
+        /// Bulk copies a DataTable into a temporary table and merges it into a SQL Server table, in this transaction: a destination row whose key columns match a DataTable row is updated, a DataTable row with no match is inserted, and, when asked, a destination row with no match is deleted.
+        /// </summary>
+        /// <inheritdoc cref="SQLServerInstance.BulkMerge(DataTable, string, IEnumerable{string}, bool, int, int?, bool)" path="/param[@name!='useTransaction']|/returns|/exception"/>
+        public int BulkMerge(DataTable dataTable, string destinationTableName, IEnumerable<string> keyColumns, bool deleteUnmatched = false, int timeout = 30, int? batchSize = null)
+        {
+            var (stagingSql, mergeSql) = SQLServerInstance.BulkMergeSql(dataTable, destinationTableName, keyColumns, deleteUnmatched);
+
+            using (var staging = new SqlCommand(stagingSql, _connection, Transaction))
+            {
+                staging.ExecuteNonQuery();
+            }
+
+            using (var bulkCopy = new SqlBulkCopy(_connection, SqlBulkCopyOptions.Default, Transaction))
+            {
+                bulkCopy.BulkCopyTimeout = timeout;
+                if (batchSize.HasValue) bulkCopy.BatchSize = batchSize.Value;
+                bulkCopy.DestinationTableName = SQLServerInstance.BulkMergeStagingTable;
+                bulkCopy.WriteToServer(dataTable);
+            }
+
+            using var merge = new SqlCommand(mergeSql, _connection, Transaction);
+            merge.CommandTimeout = timeout;
+            return merge.ExecuteNonQuery();
         }
     }
 }

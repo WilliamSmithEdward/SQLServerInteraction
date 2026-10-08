@@ -1,4 +1,4 @@
-﻿using Microsoft.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 
 namespace SQLServerInteraction
 {
@@ -26,12 +26,25 @@ namespace SQLServerInteraction
         /// <exception cref="ArgumentException">The table name is not a valid name, or <paramref name="condition"/> is empty or whitespace.</exception>
         public async Task DeleteDataAsync(string sqlServerTableName, string condition, Dictionary<string, object>? parameters)
         {
-            string sql = $"DELETE FROM {SqlIdentifier.Quote(sqlServerTableName)} WHERE {RequireCondition(condition, nameof(condition))}";
+            using var work = await ConnectAsync();
+            await work.DeleteDataAsync(sqlServerTableName, condition, parameters);
+        }
+    }
 
-            using var connection = new SqlConnection(_connectionString);
-            await connection.OpenAsync();
+    public partial class SQLServerTransaction
+    {
+        /// <inheritdoc cref="SQLServerInstance.DeleteDataAsync(string, string)"/>
+        public Task DeleteDataAsync(string sqlServerTableName, string condition = "")
+        {
+            return DeleteDataAsync(sqlServerTableName, condition, null);
+        }
 
-            using var command = new SqlCommand(sql, connection);
+        /// <inheritdoc cref="SQLServerInstance.DeleteDataAsync(string, string, Dictionary{string, object}?)"/>
+        public async Task DeleteDataAsync(string sqlServerTableName, string condition, Dictionary<string, object>? parameters)
+        {
+            string sql = SQLServerInstance.DeleteSql(sqlServerTableName, condition);
+
+            using var command = new SqlCommand(sql, _connection, Transaction);
             CommandParameters.Add(command, parameters);
             await command.ExecuteNonQueryAsync();
         }

@@ -16,6 +16,8 @@ unlisted on nuget.org.
 * `MergeData` and `MergeDataAsync` merge one table into another with a `MERGE` statement: a target row whose key columns match a source row is updated, a source row with no match is inserted, and with `deleteUnmatched` a target row with no match is deleted. Every name is quoted as an identifier, and the method returns the number of rows affected.
 * `BulkMerge` and `BulkMergeAsync` bulk copy a DataTable into a temporary table and merge it into the destination in one transaction, matching columns by name. They take the same `deleteUnmatched`, a `timeout` for the copy and the merge, and `batchSize`.
 * All four take `useTransaction`, true by default, as `BulkCopy` does.
+* `BeginTransaction` and `BeginTransactionAsync` return a `SQLServerTransaction`: one connection and one transaction on which the queries, commands, inserts, updates, deletes, merges and bulk copies run together, with the same signatures as on `SQLServerInstance`. `Commit` commits; disposing without a commit rolls back. Each takes an optional `IsolationLevel`.
+* `ExecuteTransaction` and `ExecuteTransactionAsync` now run through that object. Their behavior is unchanged.
 
 ## [2.0.1] - 2026-10-04
 

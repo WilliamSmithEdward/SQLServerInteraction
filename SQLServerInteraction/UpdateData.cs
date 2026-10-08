@@ -1,4 +1,4 @@
-﻿using Microsoft.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 
 namespace SQLServerInteraction
 {
@@ -26,23 +26,36 @@ namespace SQLServerInteraction
         /// <exception cref="ArgumentException">A table or column name is not a valid name, there are no values, or <paramref name="condition"/> is empty or whitespace.</exception>
         public void UpdateData(string sqlServerTableName, Dictionary<string, object> valuesToUpdate, string condition, Dictionary<string, object>? parameters)
         {
-            string sql = UpdateSql(sqlServerTableName, valuesToUpdate.Keys, condition);
-
-            using var connection = new SqlConnection(_connectionString);
-            connection.Open();
-
-            using var command = new SqlCommand(sql, connection);
-            AddValueParameters(command, valuesToUpdate.Values);
-            CommandParameters.Add(command, parameters);
-
-            command.ExecuteNonQuery();
+            using var work = Connect();
+            work.UpdateData(sqlServerTableName, valuesToUpdate, condition, parameters);
         }
 
-        private static string UpdateSql(string tableName, IEnumerable<string> columnNames, string condition)
+        internal static string UpdateSql(string tableName, IEnumerable<string> columnNames, string condition)
         {
             var columns = QuoteColumns(columnNames, nameof(columnNames));
             string setClause = string.Join(", ", columns.Select((column, i) => $"{column} = {CommandParameters.ValuePrefix}{i}"));
             return $"UPDATE {SqlIdentifier.Quote(tableName)} SET {setClause} WHERE {RequireCondition(condition, nameof(condition))}";
+        }
+    }
+
+    public partial class SQLServerTransaction
+    {
+        /// <inheritdoc cref="SQLServerInstance.UpdateData(string, Dictionary{string, object}, string)"/>
+        public void UpdateData(string sqlServerTableName, Dictionary<string, object> valuesToUpdate, string condition = "")
+        {
+            UpdateData(sqlServerTableName, valuesToUpdate, condition, null);
+        }
+
+        /// <inheritdoc cref="SQLServerInstance.UpdateData(string, Dictionary{string, object}, string, Dictionary{string, object}?)"/>
+        public void UpdateData(string sqlServerTableName, Dictionary<string, object> valuesToUpdate, string condition, Dictionary<string, object>? parameters)
+        {
+            string sql = SQLServerInstance.UpdateSql(sqlServerTableName, valuesToUpdate.Keys, condition);
+
+            using var command = new SqlCommand(sql, _connection, Transaction);
+            SQLServerInstance.AddValueParameters(command, valuesToUpdate.Values);
+            CommandParameters.Add(command, parameters);
+
+            command.ExecuteNonQuery();
         }
     }
 }

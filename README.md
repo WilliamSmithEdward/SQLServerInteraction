@@ -8,7 +8,7 @@
 [![OpenSSF Scorecard](https://img.shields.io/ossf-scorecard/github.com/WilliamSmithEdward/SQLServerInteraction?label=openssf%20score)](https://scorecard.dev/viewer/?uri=github.com/WilliamSmithEdward/SQLServerInteraction)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](https://github.com/WilliamSmithEdward/SQLServerInteraction/blob/main/LICENSE)
 
-SQLServerInteraction is a thin layer over Microsoft.Data.SqlClient for .NET 9. A `SQLServerInstance` holds a connection string, and each of its methods opens a connection, runs one piece of work (a query, a command, a bulk copy, a backup, a schema lookup) and closes the connection again. A separate `QueryBuilder` assembles SELECT statements from strings.
+SQLServerInteraction is a thin layer over Microsoft.Data.SqlClient for .NET 9. A `SQLServerInstance` holds a connection string, and each of its methods opens a connection, runs one piece of work (a query, a command, a bulk copy, a backup, a schema lookup) and closes the connection again; `BeginTransaction` gives an object that runs several of them in one transaction. A separate `QueryBuilder` assembles SELECT statements from strings.
 
 ```
 dotnet add package SQLServerInteraction
@@ -171,6 +171,31 @@ db.ExecuteTransaction([
 ```
 
 `ExecuteTransaction` and `ExecuteTransactionAsync` run the commands in order on one connection inside one transaction. If any command throws, the transaction is rolled back and the exception is rethrown; otherwise it is committed. The commands take no parameters.
+
+To run the library's own methods in one transaction, begin one and call them on it:
+
+```csharp
+using var transaction = db.BeginTransaction();
+
+transaction.DeleteData("dbo.Orders", "CustomerId = @Id", new Dictionary<string, object> { ["Id"] = 7 });
+transaction.InsertData("dbo.Orders", new Dictionary<string, object> { ["CustomerId"] = 7, ["Total"] = 10m });
+transaction.BulkCopy(orderLines, "dbo.OrderLines");
+int pending = transaction.ExecuteScalar<int>("SELECT COUNT(*) FROM dbo.Orders WHERE Status = 'Pending'");
+
+transaction.Commit();
+
+// The same with the async methods
+await using var work = await db.BeginTransactionAsync(IsolationLevel.Serializable);
+await work.BulkMergeAsync(rows, "dbo.Orders", ["OrderId"]);
+await work.CommitAsync();
+```
+
+`BeginTransaction` and `BeginTransactionAsync` open one connection, begin a transaction on it, and return a `SQLServerTransaction` that owns both. Each takes an optional `IsolationLevel`; without one, SqlClient's default (read committed) applies. The object has the data methods of `SQLServerInstance` with the same signatures, minus any `useTransaction` parameter: `ExecuteQuery`, `ExecuteQuery<T>`, `ExecuteScalar<T>`, `ExecuteQueryToObjectList<T>`, `ExecuteParameterizedQuery`, `ExecuteSQL`, `ExecuteNonQueryWithParameters`, `ExecuteStoredProcedure`, `InsertData`, `InsertData<T>`, `UpdateData`, `DeleteData`, `MergeData`, `BulkCopy`, `BulkMerge`, and their async versions. A query on it sees the transaction's own uncommitted work.
+
+- `Commit` (or `CommitAsync`) commits. `Rollback` rolls back early. Disposing the object without a commit rolls back, so a `using` block is enough: an exception in the middle leaves the database as it was.
+- After a commit, rollback or dispose, every method throws `InvalidOperationException` (or `ObjectDisposedException`), so a transaction cannot be reused by mistake.
+- The object is not thread-safe. Use it from one thread, or one async flow, at a time, and dispose it promptly: it holds a pooled connection and the transaction's locks until then.
+- Backup, restore, CSV export, the schema lookups and `ExecuteScriptFromFileAsync` are not on it. Each of those still opens its own connection.
 
 ### Running a script file
 

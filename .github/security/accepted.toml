@@ -13,85 +13,85 @@
 tool = "Semgrep"
 rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
 reason = "ExecuteQuery runs the SQL the caller passes; running the caller's SQL is the method's purpose, and the README lists it under the methods that run your SQL."
-where = [{ path = "SQLServerInteraction/ExecuteQuery.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+where = [{ path = "SQLServerInteraction/ExecuteQuery.cs", line = "using var command = new SqlCommand(sql, _connection, Transaction);" }]
 
 [[finding]]
 tool = "Semgrep"
 rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
 reason = "ExecuteQueryAsync runs the SQL the caller passes; running the caller's SQL is the method's purpose, and the README lists it under the methods that run your SQL."
-where = [{ path = "SQLServerInteraction/ExecuteQueryAsync.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+where = [{ path = "SQLServerInteraction/ExecuteQueryAsync.cs", line = "using var command = new SqlCommand(sql, _connection, Transaction);" }]
 
 [[finding]]
 tool = "Semgrep"
 rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
 reason = "ExecuteQuery<T> runs the SQL the caller passes; running the caller's SQL is the method's purpose, and the README lists it under the methods that run your SQL."
-where = [{ path = "SQLServerInteraction/ExecuteQueryT.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+where = [{ path = "SQLServerInteraction/ExecuteQueryT.cs", line = "using var command = new SqlCommand(sql, _connection, Transaction);" }]
 
 [[finding]]
 tool = "Semgrep"
 rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
 reason = "ExecuteQueryAsync<T> runs the SQL the caller passes; running the caller's SQL is the method's purpose, and the README lists it under the methods that run your SQL."
-where = [{ path = "SQLServerInteraction/ExecuteQueryTAsync.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+where = [{ path = "SQLServerInteraction/ExecuteQueryTAsync.cs", line = "using var command = new SqlCommand(sql, _connection, Transaction);" }]
 
 [[finding]]
 tool = "Semgrep"
 rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
 reason = "ExecuteScalar<T> runs the SQL the caller passes; running the caller's SQL is the method's purpose, and the README lists it under the methods that run your SQL."
-where = [{ path = "SQLServerInteraction/ExecuteScalarT.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+where = [{ path = "SQLServerInteraction/ExecuteScalarT.cs", line = "using var command = new SqlCommand(sql, _connection, Transaction);" }]
 
 [[finding]]
 tool = "Semgrep"
 rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
 reason = "ExecuteScalarAsync<T> runs the SQL the caller passes; running the caller's SQL is the method's purpose, and the README lists it under the methods that run your SQL."
-where = [{ path = "SQLServerInteraction/ExecuteScalarTAsync.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+where = [{ path = "SQLServerInteraction/ExecuteScalarTAsync.cs", line = "using var command = new SqlCommand(sql, _connection, Transaction);" }]
 
 [[finding]]
 tool = "Semgrep"
 rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
 reason = "ExecuteSQL runs the SQL the caller passes; running the caller's SQL is the method's purpose, and the README lists it under the methods that run your SQL. IndexCreate and IndexDrop also run through it, with every name quoted by SqlIdentifier."
-where = [{ path = "SQLServerInteraction/ExecuteSQL.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+where = [{ path = "SQLServerInteraction/ExecuteSQL.cs", line = "using var command = new SqlCommand(sql, _connection, Transaction);" }]
 
 [[finding]]
 tool = "Semgrep"
 rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
 reason = "ExecuteSQLAsync runs the SQL the caller passes; running the caller's SQL is the method's purpose, and the README lists it under the methods that run your SQL."
-where = [{ path = "SQLServerInteraction/ExecuteSQLAsync.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+where = [{ path = "SQLServerInteraction/ExecuteSQLAsync.cs", line = "using var command = new SqlCommand(sql, _connection, Transaction);" }]
 
 [[finding]]
 tool = "Semgrep"
 rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
 reason = "ExecuteNonQueryWithParameters runs the SQL the caller passes; running the caller's SQL is the method's purpose, and the README lists it under the methods that run your SQL. Values go as parameters: the dictionary becomes SqlParameters."
-where = [{ path = "SQLServerInteraction/ExecuteNonQueryWithParameters.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+where = [{ path = "SQLServerInteraction/ExecuteNonQueryWithParameters.cs", line = "using var command = new SqlCommand(sql, _connection, Transaction);" }]
 
 [[finding]]
 tool = "Semgrep"
 rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
 reason = "ExecuteNonQueryWithParametersAsync runs the SQL the caller passes; running the caller's SQL is the method's purpose, and the README lists it under the methods that run your SQL. Values go as parameters: the dictionary becomes SqlParameters."
-where = [{ path = "SQLServerInteraction/ExecuteNonQueryWithParametersAsync.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+where = [{ path = "SQLServerInteraction/ExecuteNonQueryWithParametersAsync.cs", line = "using var command = new SqlCommand(sql, _connection, Transaction);" }]
 
 [[finding]]
 tool = "Semgrep"
 rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
 reason = "ExecuteParameterizedQuery runs the SQL the caller passes; running the caller's SQL is the method's purpose, and the README lists it under the methods that run your SQL. Values go as parameters: the caller's SqlParameter array."
-where = [{ path = "SQLServerInteraction/ExecuteParameterizedQuery.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+where = [{ path = "SQLServerInteraction/ExecuteParameterizedQuery.cs", line = "using var command = new SqlCommand(sql, _connection, Transaction);" }]
 
 [[finding]]
 tool = "Semgrep"
 rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
 reason = "ExecuteParameterizedQueryAsync runs the SQL the caller passes; running the caller's SQL is the method's purpose, and the README lists it under the methods that run your SQL. Values go as parameters: the caller's SqlParameter array."
-where = [{ path = "SQLServerInteraction/ExecuteParameterizedQueryAsync.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+where = [{ path = "SQLServerInteraction/ExecuteParameterizedQueryAsync.cs", line = "using var command = new SqlCommand(sql, _connection, Transaction);" }]
 
 [[finding]]
 tool = "Semgrep"
 rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
 reason = "ExecuteQueryToObjectList<T> runs the SQL the caller passes; running the caller's SQL is the method's purpose, and the README lists it under the methods that run your SQL. Values go as parameters: the dictionary becomes SqlParameters."
-where = [{ path = "SQLServerInteraction/ExecuteQueryToObjectListT.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+where = [{ path = "SQLServerInteraction/ExecuteQueryToObjectListT.cs", line = "using var command = new SqlCommand(sql, _connection, Transaction);" }]
 
 [[finding]]
 tool = "Semgrep"
 rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
 reason = "ExecuteQueryToObjectListAsync<T> runs the SQL the caller passes; running the caller's SQL is the method's purpose, and the README lists it under the methods that run your SQL. Values go as parameters: the dictionary becomes SqlParameters."
-where = [{ path = "SQLServerInteraction/ExecuteQueryToObjectListTAsync.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+where = [{ path = "SQLServerInteraction/ExecuteQueryToObjectListTAsync.cs", line = "using var command = new SqlCommand(sql, _connection, Transaction);" }]
 
 [[finding]]
 tool = "Semgrep"
@@ -109,13 +109,13 @@ where = [{ path = "SQLServerInteraction/ExecuteScriptFromFileAsync.cs", line = "
 tool = "Semgrep"
 rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
 reason = "ExecuteStoredProcedure sends the stored procedure name with CommandType.StoredProcedure, so SqlClient calls it as a procedure name; it is not parsed as a batch. Its values go in the caller's SqlParameter array."
-where = [{ path = "SQLServerInteraction/ExecuteStoredProcedure.cs", line = "using var command = new SqlCommand(storedProcedureName, connection);" }]
+where = [{ path = "SQLServerInteraction/ExecuteStoredProcedure.cs", line = "using var command = new SqlCommand(storedProcedureName, _connection, Transaction);" }]
 
 [[finding]]
 tool = "Semgrep"
 rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
 reason = "ExecuteStoredProcedureAsync sends the stored procedure name with CommandType.StoredProcedure, so SqlClient calls it as a procedure name; it is not parsed as a batch. Its values go in the caller's SqlParameter array."
-where = [{ path = "SQLServerInteraction/ExecuteStoredProcedureAsync.cs", line = "using var command = new SqlCommand(storedProcedureName, connection);" }]
+where = [{ path = "SQLServerInteraction/ExecuteStoredProcedureAsync.cs", line = "using var command = new SqlCommand(storedProcedureName, _connection, Transaction);" }]
 
 [[finding]]
 tool = "Semgrep"
@@ -127,37 +127,37 @@ where = [{ path = "SQLServerInteraction/GetStoredProcedureParameters.cs", line =
 tool = "Semgrep"
 rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
 reason = "DeleteData takes its condition as a SQL fragment by design, documented as such. The table name is quoted by SqlIdentifier, an empty condition throws, and values in the condition go as parameters through the overload that takes them."
-where = [{ path = "SQLServerInteraction/DeleteData.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+where = [{ path = "SQLServerInteraction/DeleteData.cs", line = "using var command = new SqlCommand(sql, _connection, Transaction);" }]
 
 [[finding]]
 tool = "Semgrep"
 rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
 reason = "DeleteDataAsync takes its condition as a SQL fragment by design, documented as such. The table name is quoted by SqlIdentifier, an empty condition throws, and values in the condition go as parameters through the overload that takes them."
-where = [{ path = "SQLServerInteraction/DeleteDataAsync.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+where = [{ path = "SQLServerInteraction/DeleteDataAsync.cs", line = "using var command = new SqlCommand(sql, _connection, Transaction);" }]
 
 [[finding]]
 tool = "Semgrep"
 rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
 reason = "UpdateData takes its condition as a SQL fragment by design, documented as such. The table name and every column name are quoted by SqlIdentifier, an empty condition throws, and values in the condition go as parameters through the overload that takes them. The values to set are parameters."
-where = [{ path = "SQLServerInteraction/UpdateData.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+where = [{ path = "SQLServerInteraction/UpdateData.cs", line = "using var command = new SqlCommand(sql, _connection, Transaction);" }]
 
 [[finding]]
 tool = "Semgrep"
 rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
 reason = "UpdateDataAsync takes its condition as a SQL fragment by design, documented as such. The table name and every column name are quoted by SqlIdentifier, an empty condition throws, and values in the condition go as parameters through the overload that takes them. The values to set are parameters."
-where = [{ path = "SQLServerInteraction/UpdateDataAsync.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+where = [{ path = "SQLServerInteraction/UpdateDataAsync.cs", line = "using var command = new SqlCommand(sql, _connection, Transaction);" }]
 
 [[finding]]
 tool = "Semgrep"
 rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
 reason = "BulkCopy takes its flush condition as a SQL fragment by design, documented as such. The table name is quoted by SqlIdentifier, an empty condition throws, and values in the condition go as parameters through the overload that takes them."
-where = [{ path = "SQLServerInteraction/BulkCopy.cs", line = "using var command = new SqlCommand(deleteSQL, connection, transaction);" }]
+where = [{ path = "SQLServerInteraction/BulkCopy.cs", line = "using var command = new SqlCommand(deleteSQL, _connection, Transaction);" }]
 
 [[finding]]
 tool = "Semgrep"
 rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
 reason = "BulkCopyAsync takes its flush condition as a SQL fragment by design, documented as such. The table name is quoted by SqlIdentifier, an empty condition throws, and values in the condition go as parameters through the overload that takes them."
-where = [{ path = "SQLServerInteraction/BulkCopyAsync.cs", line = "using var command = new SqlCommand(deleteSQL, connection, transaction);" }]
+where = [{ path = "SQLServerInteraction/BulkCopyAsync.cs", line = "using var command = new SqlCommand(deleteSQL, _connection, Transaction);" }]
 
 [[finding]]
 tool = "Semgrep"
@@ -175,45 +175,45 @@ where = [{ path = "SQLServerInteraction/GetTableSchema.cs", line = "using var co
 tool = "Semgrep"
 rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
 reason = "InsertData builds its SQL from the table name and the dictionary keys as column names, each quoted by SqlIdentifier.Quote, and sends every value as a parameter (@__value_0, ...). The integration tests InjectionTests.A_hostile_table_name_is_a_name_to_every_method_that_takes_one and InjectionTests.A_hostile_column_name_is_a_name insert through it into a table and a column whose names carry DROP TABLE and check the victims survive."
-where = [{ path = "SQLServerInteraction/InsertData.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+where = [{ path = "SQLServerInteraction/InsertData.cs", line = "using var command = new SqlCommand(sql, _connection, Transaction);" }]
 
 [[finding]]
 tool = "Semgrep"
 rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
 reason = "InsertDataAsync builds its SQL from the table name and the dictionary keys as column names, each quoted by SqlIdentifier.Quote, and sends every value as a parameter (@__value_0, ...). The integration tests InjectionTests.A_hostile_table_name_is_a_name_to_every_method_that_takes_one and InjectionTests.A_hostile_column_name_is_a_name insert through it into a table and a column whose names carry DROP TABLE and check the victims survive."
-where = [{ path = "SQLServerInteraction/InsertDataAsync.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+where = [{ path = "SQLServerInteraction/InsertDataAsync.cs", line = "using var command = new SqlCommand(sql, _connection, Transaction);" }]
 
 [[finding]]
 tool = "Semgrep"
 rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
 reason = "InsertData<T> builds its SQL from the table name and the column names from ColumnAttribute or the property names, each quoted by SqlIdentifier.Quote, and sends every value as a parameter (@__value_0, ...). The integration tests InjectionTests.InsertData_of_T_reads_hostile_table_and_column_names_as_names insert through it into a table and a column whose names carry DROP TABLE and check the victims survive."
-where = [{ path = "SQLServerInteraction/InsertDataT.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+where = [{ path = "SQLServerInteraction/InsertDataT.cs", line = "using var command = new SqlCommand(sql, _connection, Transaction);" }]
 
 [[finding]]
 tool = "Semgrep"
 rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
 reason = "InsertDataAsync<T> builds its SQL from the table name and the column names from ColumnAttribute or the property names, each quoted by SqlIdentifier.Quote, and sends every value as a parameter (@__value_0, ...). The integration tests InjectionTests.InsertData_of_T_reads_hostile_table_and_column_names_as_names insert through it into a table and a column whose names carry DROP TABLE and check the victims survive."
-where = [{ path = "SQLServerInteraction/InsertDataTAsync.cs", line = "using var command = new SqlCommand(sql, connection);" }]
+where = [{ path = "SQLServerInteraction/InsertDataTAsync.cs", line = "using var command = new SqlCommand(sql, _connection, Transaction);" }]
 
 [[finding]]
 tool = "Semgrep"
 rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
 reason = "MergeData builds its MERGE from the two table names and the key and value column names, each quoted by SqlIdentifier.Quote, so every name is read as a name; there are no values, since the rows come from the source table. The integration test InjectionTests.MergeData_and_BulkMerge_read_hostile_table_and_column_names_as_names runs it on tables and a column whose names carry DROP TABLE and checks the victim survives."
-where = [{ path = "SQLServerInteraction/MergeData.cs", line = "using var command = new SqlCommand(sql, connection, transaction);" }]
+where = [{ path = "SQLServerInteraction/MergeData.cs", line = "using var command = new SqlCommand(sql, _connection, Transaction);" }]
 
 [[finding]]
 tool = "Semgrep"
 rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
 reason = "MergeDataAsync builds its MERGE from the two table names and the key and value column names, each quoted by SqlIdentifier.Quote, so every name is read as a name; there are no values, since the rows come from the source table. The integration test InjectionTests.MergeData_and_BulkMerge_read_hostile_table_and_column_names_as_names runs it on tables and a column whose names carry DROP TABLE and checks the victim survives."
-where = [{ path = "SQLServerInteraction/MergeDataAsync.cs", line = "using var command = new SqlCommand(sql, connection, transaction);" }]
+where = [{ path = "SQLServerInteraction/MergeDataAsync.cs", line = "using var command = new SqlCommand(sql, _connection, Transaction);" }]
 
 [[finding]]
 tool = "Semgrep"
 rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
 reason = "BulkMerge builds its SELECT INTO and MERGE from the table name, quoted by SqlIdentifier.Quote, and the DataTable's column names, each bracketed by SqlIdentifier.QuotePart, so every name is read as a name; the rows go through SqlBulkCopy into a temporary table, never into the SQL. The integration test InjectionTests.MergeData_and_BulkMerge_read_hostile_table_and_column_names_as_names runs it on a table and a column whose names carry DROP TABLE and checks the victim survives."
 where = [
-  { path = "SQLServerInteraction/BulkMerge.cs", line = "using (var staging = new SqlCommand(stagingSql, connection, transaction))" },
-  { path = "SQLServerInteraction/BulkMerge.cs", line = "using var merge = new SqlCommand(mergeSql, connection, transaction);" },
+  { path = "SQLServerInteraction/BulkMerge.cs", line = "using (var staging = new SqlCommand(stagingSql, _connection, Transaction))" },
+  { path = "SQLServerInteraction/BulkMerge.cs", line = "using var merge = new SqlCommand(mergeSql, _connection, Transaction);" },
 ]
 
 [[finding]]
@@ -221,6 +221,6 @@ tool = "Semgrep"
 rule = "csharp.lang.security.sqli.csharp-sqli.csharp-sqli"
 reason = "BulkMergeAsync builds its SELECT INTO and MERGE from the table name, quoted by SqlIdentifier.Quote, and the DataTable's column names, each bracketed by SqlIdentifier.QuotePart, so every name is read as a name; the rows go through SqlBulkCopy into a temporary table, never into the SQL. The integration test InjectionTests.MergeData_and_BulkMerge_read_hostile_table_and_column_names_as_names runs it on a table and a column whose names carry DROP TABLE and checks the victim survives."
 where = [
-  { path = "SQLServerInteraction/BulkMergeAsync.cs", line = "using (var staging = new SqlCommand(stagingSql, connection, transaction))" },
-  { path = "SQLServerInteraction/BulkMergeAsync.cs", line = "using var merge = new SqlCommand(mergeSql, connection, transaction);" },
+  { path = "SQLServerInteraction/BulkMergeAsync.cs", line = "using (var staging = new SqlCommand(stagingSql, _connection, Transaction))" },
+  { path = "SQLServerInteraction/BulkMergeAsync.cs", line = "using var merge = new SqlCommand(mergeSql, _connection, Transaction);" },
 ]

@@ -1,4 +1,4 @@
-﻿using Microsoft.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 
 namespace SQLServerInteraction
 {
@@ -11,13 +11,18 @@ namespace SQLServerInteraction
         /// <param name="parameters">A dictionary of parameters to be added to the SQL command. Names work with or without the @, and null is sent as NULL.</param>
         public void ExecuteNonQueryWithParameters(string sql, Dictionary<string, object> parameters)
         {
-            using var connection = new SqlConnection(_connectionString);
-            connection.Open();
+            using var work = Connect();
+            work.ExecuteNonQueryWithParameters(sql, parameters);
+        }
+    }
 
-            using var command = new SqlCommand(sql, connection);
-
+    public partial class SQLServerTransaction
+    {
+        /// <inheritdoc cref="SQLServerInstance.ExecuteNonQueryWithParameters(string, Dictionary{string, object})"/>
+        public void ExecuteNonQueryWithParameters(string sql, Dictionary<string, object> parameters)
+        {
+            using var command = new SqlCommand(sql, _connection, Transaction);
             CommandParameters.Add(command, parameters);
-
             command.ExecuteNonQuery();
         }
     }

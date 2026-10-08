@@ -1,4 +1,4 @@
-﻿using Microsoft.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 using System.Reflection;
 
 namespace SQLServerInteraction
@@ -14,26 +14,33 @@ namespace SQLServerInteraction
         /// <exception cref="ArgumentException">The table name or a column name is not a valid name, or <typeparamref name="T"/> has no such properties.</exception>
         public void InsertData<T>(T data, string sqlServerTableName) where T : class
         {
-            var properties = InsertProperties<T>();
-            string sql = InsertSql(sqlServerTableName, properties.Select(p => p.Column));
-
-            using var connection = new SqlConnection(_connectionString);
-            connection.Open();
-
-            using var command = new SqlCommand(sql, connection);
-            AddValueParameters(command, properties.Select(p => p.Property.GetValue(data)));
-
-            command.ExecuteNonQuery();
+            using var work = Connect();
+            work.InsertData(data, sqlServerTableName);
         }
 
         /// <summary>
         /// The properties <see cref="InsertData{T}(T, string)"/> writes, each with its column name:
         /// public instance properties with a public getter and no index parameters.
         /// </summary>
-        private static List<(PropertyInfo Property, string Column)> InsertProperties<T>() =>
+        internal static List<(PropertyInfo Property, string Column)> InsertProperties<T>() =>
             typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance)
                 .Where(p => p.GetMethod is { IsPublic: true } && p.GetIndexParameters().Length == 0)
                 .Select(p => (p, p.GetCustomAttribute<ColumnAttribute>()?.Name ?? p.Name))
                 .ToList();
+    }
+
+    public partial class SQLServerTransaction
+    {
+        /// <inheritdoc cref="SQLServerInstance.InsertData{T}(T, string)"/>
+        public void InsertData<T>(T data, string sqlServerTableName) where T : class
+        {
+            var properties = SQLServerInstance.InsertProperties<T>();
+            string sql = SQLServerInstance.InsertSql(sqlServerTableName, properties.Select(p => p.Column));
+
+            using var command = new SqlCommand(sql, _connection, Transaction);
+            SQLServerInstance.AddValueParameters(command, properties.Select(p => p.Property.GetValue(data)));
+
+            command.ExecuteNonQuery();
+        }
     }
 }

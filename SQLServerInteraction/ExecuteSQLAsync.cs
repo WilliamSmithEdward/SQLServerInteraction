@@ -1,4 +1,4 @@
-﻿using Microsoft.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 
 namespace SQLServerInteraction
 {
@@ -11,12 +11,17 @@ namespace SQLServerInteraction
         /// <returns>A task representing the asynchronous operation.</returns>
         public async Task ExecuteSQLAsync(string sql)
         {
-            using var connection = new SqlConnection(_connectionString);
+            using var work = await ConnectAsync();
+            await work.ExecuteSQLAsync(sql);
+        }
+    }
 
-            await connection.OpenAsync();
-
-            using var command = new SqlCommand(sql, connection);
-
+    public partial class SQLServerTransaction
+    {
+        /// <inheritdoc cref="SQLServerInstance.ExecuteSQLAsync(string)"/>
+        public async Task ExecuteSQLAsync(string sql)
+        {
+            using var command = new SqlCommand(sql, _connection, Transaction);
             await command.ExecuteNonQueryAsync();
         }
     }

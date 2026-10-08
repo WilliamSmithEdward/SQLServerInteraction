@@ -1,4 +1,4 @@
-﻿using Microsoft.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 using System.Data;
 
 namespace SQLServerInteraction
@@ -12,14 +12,20 @@ namespace SQLServerInteraction
         /// <returns>A DataTable containing the results of the query.</returns>
         public async Task<DataTable> ExecuteQueryAsync(string sql)
         {
+            using var work = await ConnectAsync();
+            return await work.ExecuteQueryAsync(sql);
+        }
+    }
+
+    public partial class SQLServerTransaction
+    {
+        /// <inheritdoc cref="SQLServerInstance.ExecuteQueryAsync(string)"/>
+        public async Task<DataTable> ExecuteQueryAsync(string sql)
+        {
             var dataTable = new DataTable();
 
-            using var connection = new SqlConnection(_connectionString);
-            await connection.OpenAsync();
-
-            using var command = new SqlCommand(sql, connection);
+            using var command = new SqlCommand(sql, _connection, Transaction);
             using var adapter = new SqlDataAdapter(command);
-
             await Task.Run(() => adapter.Fill(dataTable));
 
             return dataTable;

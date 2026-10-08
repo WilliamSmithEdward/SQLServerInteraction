@@ -1,4 +1,4 @@
-﻿using Microsoft.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 
 namespace SQLServerInteraction
 {
@@ -11,12 +11,18 @@ namespace SQLServerInteraction
         /// <param name="parameters">An array of SqlParameter objects to be added to the SQL command.</param>
         public void ExecuteParameterizedQuery(string sql, SqlParameter[] parameters)
         {
-            using var connection = new SqlConnection(_connectionString);
-            connection.Open();
+            using var work = Connect();
+            work.ExecuteParameterizedQuery(sql, parameters);
+        }
+    }
 
-            using var command = new SqlCommand(sql, connection);
+    public partial class SQLServerTransaction
+    {
+        /// <inheritdoc cref="SQLServerInstance.ExecuteParameterizedQuery(string, SqlParameter[])"/>
+        public void ExecuteParameterizedQuery(string sql, SqlParameter[] parameters)
+        {
+            using var command = new SqlCommand(sql, _connection, Transaction);
             command.Parameters.AddRange(parameters);
-
             command.ExecuteNonQuery();
         }
     }

@@ -1,4 +1,4 @@
-﻿using Microsoft.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 
 namespace SQLServerInteraction
 {
@@ -12,18 +12,24 @@ namespace SQLServerInteraction
         /// <returns>A list of objects of type <typeparamref name="T"/> containing the results of the query.</returns>
         public List<T> ExecuteQuery<T>(string sql)
         {
+            using var work = Connect();
+            return work.ExecuteQuery<T>(sql);
+        }
+    }
+
+    public partial class SQLServerTransaction
+    {
+        /// <inheritdoc cref="SQLServerInstance.ExecuteQuery{T}(string)"/>
+        public List<T> ExecuteQuery<T>(string sql)
+        {
             var results = new List<T>();
 
-            using var connection = new SqlConnection(_connectionString);
-            connection.Open();
-
-            using var command = new SqlCommand(sql, connection);
+            using var command = new SqlCommand(sql, _connection, Transaction);
             using var reader = command.ExecuteReader();
 
             while (reader.Read())
             {
-                var result = reader[0];
-                results.Add(ValueConversion.ChangeQueryValue<T>(result));
+                results.Add(ValueConversion.ChangeQueryValue<T>(reader[0]));
             }
 
             return results;
