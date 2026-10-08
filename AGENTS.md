@@ -59,6 +59,19 @@ for net9.0. What an agent working here must not break:
 - **Public signatures.** Callers compile against them: add an overload or a
   method instead of a parameter on an existing public method, even an
   optional one.
+- **Async only, implemented once.** Every server-facing method is `...Async`
+  and takes an optional `CancellationToken` as its last parameter; there are
+  no synchronous twins to add. A data method is implemented on
+  `SQLServerTransaction`, in the file named after it, and the
+  `SQLServerInstance` method in the same file is one line through `RunAsync`.
+  Lookups go through `WithConnectionAsync` or the catalog helpers in
+  `SQLServerInstance.Catalog.cs`. XML docs are written on the transaction
+  method and inherited.
+- **Code scanning alerts.** GitHub code scanning raises a Semgrep alert for
+  each site the accepted list covers, and again whenever the line's
+  surroundings change. The owner dismisses each as "won't fix" with a comment
+  that starts `Accepted in .github/security/accepted.toml:` and gives the
+  reason; the required checks do not wait for it.
 - **One README for GitHub and NuGet.** The root `README.md` is packed
   directly as the nuget.org readme. Keep links and image URLs absolute,
   use NuGet-supported image hosts, and serve the Scorecard badge through

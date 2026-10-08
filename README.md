@@ -57,7 +57,7 @@ How `GetConnectionString()` builds the string:
 
 Constructing a `SQLServerInstance` does not connect. Each method call opens its own `SqlConnection` and disposes it before returning, so connection pooling is whatever the connection string sets (SqlClient pools by default). Commands use SqlClient's default 30-second command timeout; only `BulkCopyAsync` and `BulkMergeAsync` take a timeout. Every method is async and takes an optional `CancellationToken` as its last argument.
 
-Errors are not caught: a server error surfaces as SqlClient's `SqlException`, and a failed connection as whatever `SqlConnection.Open` throws.
+Errors are not caught: a server error surfaces as SqlClient's `SqlException`, and a failed connection as whatever `SqlConnection.OpenAsync` throws.
 
 Keep server names, user names and passwords out of source code. Read them from configuration or a secret store.
 
@@ -73,7 +73,6 @@ var db = new SQLServerInstance(new SQLServerConnectionString("your-server", "You
 
 // Every row and column, as a DataTable
 DataTable orders = await db.ExecuteQueryAsync("SELECT OrderId, Total FROM dbo.Orders");
-DataTable ordersAsync = await db.ExecuteQueryAsync("SELECT OrderId, Total FROM dbo.Orders");
 
 // The first column of every row, converted to T
 List<int> ids = await db.ExecuteQueryAsync<int>("SELECT OrderId FROM dbo.Orders");
@@ -85,8 +84,8 @@ decimal total = await db.ExecuteScalarAsync<decimal>("SELECT SUM(Total) FROM dbo
 ```
 
 - `ExecuteQueryAsync<T>` reads only the first column and converts each value with `Convert.ChangeType`. A nullable type such as `int?` converts to its underlying type, and NULL gives null. Otherwise a NULL becomes `""` for `string` and throws `InvalidCastException` for a value type.
-- `ExecuteScalarAsync<T>` returns `default(T)` when the query returns no rows or a NULL, and otherwise converts the value with `Convert.ChangeType`. A nullable type converts to its underlying type, so `ExecuteScalar<int?>` returns the number, or null for no rows or NULL.
-- None of these four take parameters. To filter on a value, use `ExecuteQueryToObjectListAsync<T>` below, which does.
+- `ExecuteScalarAsync<T>` returns `default(T)` when the query returns no rows or a NULL, and otherwise converts the value with `Convert.ChangeType`. A nullable type converts to its underlying type, so `ExecuteScalarAsync<int?>` returns the number, or null for no rows or NULL.
+- None of these three take parameters. To filter on a value, use `ExecuteQueryToObjectListAsync<T>` below, which does.
 
 ### Mapping rows to objects
 
@@ -193,7 +192,7 @@ await work.CommitAsync();
 `BeginTransactionAsync` opens one connection, begins a transaction on it, and returns a `SQLServerTransaction` that owns both. It takes an optional `IsolationLevel`; without one, SqlClient's default (read committed) applies. The object has the data methods of `SQLServerInstance` with the same signatures, minus any `useTransaction` parameter: `ExecuteQueryAsync`, `ExecuteQueryAsync<T>`, `ExecuteScalarAsync<T>`, `ExecuteQueryToObjectListAsync<T>`, `ExecuteParameterizedQueryAsync`, `ExecuteSQLAsync`, `ExecuteNonQueryWithParametersAsync`, `ExecuteStoredProcedureAsync`, `InsertDataAsync`, `InsertDataAsync<T>`, `UpdateDataAsync`, `DeleteDataAsync`, `MergeDataAsync`, `BulkCopyAsync`, `BulkMergeAsync`, `IndexCreateAsync` and `IndexDropAsync`. A query on it sees the transaction's own uncommitted work.
 
 - `CommitAsync` commits. `RollbackAsync` rolls back early. Disposing the object without a commit rolls back, so an `await using` block is enough: an exception in the middle leaves the database as it was.
-- After an exception from any method, roll back, or let the `using` block do it. Do not catch the exception and carry on to `CommitAsync`: for some errors, such as a constraint violation, SQL Server fails only that statement and leaves the transaction open, so the commit would keep the work done before the failure.
+- After an exception from any method, roll back, or let the `await using` block do it. Do not catch the exception and carry on to `CommitAsync`: for some errors, such as a constraint violation, SQL Server fails only that statement and leaves the transaction open, so the commit would keep the work done before the failure.
 - To undo part of a transaction on purpose, mark a savepoint with `SaveAsync(name)` and return to it with `RollbackToAsync(name)`; the transaction stays open and can still be committed. A name is one identifier of up to 32 characters, and marking it again moves it. Rolling back to a savepoint works after an error that failed one statement, such as a constraint violation, but not after one that made the transaction uncommittable, such as a deadlock: SQL Server refuses it, and only a full rollback is left.
 - If `CommitAsync` itself throws, for example because the connection dropped, the object cannot be used again and says so; dispose it, and whatever the server did not commit is rolled back.
 - Every method takes an optional `CancellationToken` as its last argument, on the transaction and on `SQLServerInstance` alike. A cancelled call throws `OperationCanceledException` and the transaction can still be rolled back.
