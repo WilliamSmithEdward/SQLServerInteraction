@@ -1,4 +1,4 @@
-﻿using Microsoft.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 
 namespace SQLServerInteraction
 {
@@ -14,14 +14,21 @@ namespace SQLServerInteraction
         /// <exception cref="ArgumentException">The table name or a column name is not a valid name, or <typeparamref name="T"/> has no such properties.</exception>
         public async Task InsertDataAsync<T>(T data, string sqlServerTableName) where T : class
         {
-            var properties = InsertProperties<T>();
-            string sql = InsertSql(sqlServerTableName, properties.Select(p => p.Column));
+            using var work = await ConnectAsync();
+            await work.InsertDataAsync(data, sqlServerTableName);
+        }
+    }
 
-            using var connection = new SqlConnection(_connectionString);
-            await connection.OpenAsync();
+    public partial class SQLServerTransaction
+    {
+        /// <inheritdoc cref="SQLServerInstance.InsertDataAsync{T}(T, string)"/>
+        public async Task InsertDataAsync<T>(T data, string sqlServerTableName) where T : class
+        {
+            var properties = SQLServerInstance.InsertProperties<T>();
+            string sql = SQLServerInstance.InsertSql(sqlServerTableName, properties.Select(p => p.Column));
 
-            using var command = new SqlCommand(sql, connection);
-            AddValueParameters(command, properties.Select(p => p.Property.GetValue(data)));
+            using var command = new SqlCommand(sql, _connection, Transaction);
+            SQLServerInstance.AddValueParameters(command, properties.Select(p => p.Property.GetValue(data)));
 
             await command.ExecuteNonQueryAsync();
         }

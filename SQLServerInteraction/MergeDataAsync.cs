@@ -17,32 +17,25 @@ namespace SQLServerInteraction
         /// <exception cref="ArgumentException">A table or column name is not a valid name, there are no key columns, or a column is named in both lists.</exception>
         public async Task<int> MergeDataAsync(string sourceTableName, string targetTableName, IEnumerable<string> keyColumns, IEnumerable<string> valueColumns, bool deleteUnmatched = false, bool useTransaction = true)
         {
-            string sql = MergeSql(sourceTableName, targetTableName, keyColumns, valueColumns, deleteUnmatched);
+            using var work = useTransaction ? await BeginTransactionAsync() : await ConnectAsync();
+            int rows = await work.MergeDataAsync(sourceTableName, targetTableName, keyColumns, valueColumns, deleteUnmatched);
+            if (useTransaction) await work.CommitAsync();
+            return rows;
+        }
+    }
 
-            using var connection = new SqlConnection(_connectionString);
-            await connection.OpenAsync();
+    public partial class SQLServerTransaction
+    {
+        /// <summary>
+        /// Asynchronously merges the rows of one SQL Server table into another with a MERGE statement, in this transaction: a target row whose key columns match a source row is updated, a source row with no match is inserted, and, when asked, a target row with no match is deleted.
+        /// </summary>
+        /// <inheritdoc cref="SQLServerInstance.MergeDataAsync(string, string, IEnumerable{string}, IEnumerable{string}, bool, bool)" path="/param[@name!='useTransaction']|/returns|/exception"/>
+        public async Task<int> MergeDataAsync(string sourceTableName, string targetTableName, IEnumerable<string> keyColumns, IEnumerable<string> valueColumns, bool deleteUnmatched = false)
+        {
+            string sql = SQLServerInstance.MergeSql(sourceTableName, targetTableName, keyColumns, valueColumns, deleteUnmatched);
 
-            SqlTransaction? transaction = useTransaction ? connection.BeginTransaction() : null;
-
-            try
-            {
-                using var command = new SqlCommand(sql, connection, transaction);
-                int rows = await command.ExecuteNonQueryAsync();
-
-                transaction?.Commit();
-                return rows;
-            }
-
-            catch
-            {
-                transaction?.Rollback();
-                throw;
-            }
-
-            finally
-            {
-                transaction?.Dispose();
-            }
+            using var command = new SqlCommand(sql, _connection, Transaction);
+            return await command.ExecuteNonQueryAsync();
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿using Microsoft.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 
 namespace SQLServerInteraction
 {
@@ -12,14 +12,18 @@ namespace SQLServerInteraction
         /// <returns>A task representing the asynchronous operation that returns the result of the query as a single value of type T, or the default value of T if the result is null or DBNull.Value.</returns>
         public async Task<T?> ExecuteScalarAsync<T>(string sql)
         {
-            using var connection = new SqlConnection(_connectionString);
-            await connection.OpenAsync();
+            using var work = await ConnectAsync();
+            return await work.ExecuteScalarAsync<T>(sql);
+        }
+    }
 
-            using var command = new SqlCommand(sql, connection);
-
-            var result = await command.ExecuteScalarAsync();
-
-            return ValueConversion.ChangeType<T>(result);
+    public partial class SQLServerTransaction
+    {
+        /// <inheritdoc cref="SQLServerInstance.ExecuteScalarAsync{T}(string)"/>
+        public async Task<T?> ExecuteScalarAsync<T>(string sql)
+        {
+            using var command = new SqlCommand(sql, _connection, Transaction);
+            return ValueConversion.ChangeType<T>(await command.ExecuteScalarAsync());
         }
     }
 }

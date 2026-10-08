@@ -1,4 +1,4 @@
-﻿using Microsoft.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 using System.Data;
 
 namespace SQLServerInteraction
@@ -33,56 +33,19 @@ namespace SQLServerInteraction
         /// <param name="flushWhereClauseCondition">An optional WHERE clause condition (without the WHERE keyword) to limit which rows are deleted when flushTable is true. If null, all rows are deleted. It is SQL text, inserted as written: put values in <paramref name="flushParameters"/> rather than in the text.</param>
         /// <param name="flushParameters">Parameters for <paramref name="flushWhereClauseCondition"/>, or null for none. Names work with or without the @, and null is sent as NULL.</param>
         /// <param name="columnMappings">Optional column mappings: each key is a column of <paramref name="dataTable"/> and its value the destination column it is copied to. Only mapped columns are copied. A destination is a column name, not SQL: SqlBulkCopy matches it to a destination column name exactly, case included, after removing brackets from a bracketed name ([Sales Region]); a name with a space needs none. A source column matches without regard to case. A destination the table does not have fails when the copy runs, after any flush; with useTransaction, the flush is rolled back. Null (the default) maps the columns by position.</param>
-        /// <exception cref="ArgumentException">The table name is not a valid name, <paramref name="flushWhereClauseCondition"/> is empty or whitespace, or <paramref name="columnMappings"/> is empty, names a column <paramref name="dataTable"/> does not have, or has an empty destination. Each is checked before a connection is opened, so nothing is deleted.</exception>
+        /// <exception cref="ArgumentException">The table name is not a valid name, <paramref name="flushWhereClauseCondition"/> is empty or whitespace, or <paramref name="columnMappings"/> is empty, names a column <paramref name="dataTable"/> does not have, or has an empty destination. Each is checked before anything runs, so nothing is deleted.</exception>
         public void BulkCopy(DataTable dataTable, string destinationTableName, bool flushTable, string? flushWhereClauseCondition, Dictionary<string, object>? flushParameters, int bulkCopyTimeout = 30, int? batchSize = null, bool useTransaction = true, IReadOnlyDictionary<string, string>? columnMappings = null)
         {
-            string table = SqlIdentifier.Quote(destinationTableName);
-            var mappings = BulkCopyColumnMappings(dataTable, columnMappings);
-            string deleteSQL = "DELETE FROM " + table + (flushWhereClauseCondition == null ? "" : " WHERE " + RequireCondition(flushWhereClauseCondition, nameof(flushWhereClauseCondition)));
-
-            using var connection = new SqlConnection(_connectionString);
-            connection.Open();
-
-            SqlTransaction? transaction = useTransaction ? connection.BeginTransaction() : null;
-
-            try
-            {
-                using var bulkCopy = new SqlBulkCopy(connection, SqlBulkCopyOptions.Default, transaction);
-
-                bulkCopy.BulkCopyTimeout = bulkCopyTimeout;
-                if (batchSize.HasValue) bulkCopy.BatchSize = batchSize.Value;
-
-                if (flushTable)
-                {
-                    using var command = new SqlCommand(deleteSQL, connection, transaction);
-                    CommandParameters.Add(command, flushParameters);
-                    command.ExecuteNonQuery();
-                }
-
-                bulkCopy.DestinationTableName = table;
-                mappings?.ForEach(mapping => bulkCopy.ColumnMappings.Add(mapping));
-                bulkCopy.WriteToServer(dataTable);
-
-                transaction?.Commit();
-            }
-
-            catch
-            {
-                transaction?.Rollback();
-                throw;
-            }
-
-            finally
-            {
-                transaction?.Dispose();
-            }
+            using var work = useTransaction ? BeginTransaction() : Connect();
+            work.BulkCopy(dataTable, destinationTableName, flushTable, flushWhereClauseCondition, flushParameters, bulkCopyTimeout, batchSize, columnMappings);
+            if (useTransaction) work.Commit();
         }
 
         /// <summary>
         /// The caller's column mappings as SqlBulkCopy mappings, checked before anything runs: null means none.
         /// </summary>
         /// <exception cref="ArgumentException">The mappings are empty, name a column the DataTable does not have, or have an empty destination.</exception>
-        private static List<SqlBulkCopyColumnMapping>? BulkCopyColumnMappings(DataTable dataTable, IReadOnlyDictionary<string, string>? columnMappings)
+        internal static List<SqlBulkCopyColumnMapping>? BulkCopyColumnMappings(DataTable dataTable, IReadOnlyDictionary<string, string>? columnMappings)
         {
             if (columnMappings == null) return null;
             if (columnMappings.Count == 0)
@@ -99,6 +62,41 @@ namespace SQLServerInteraction
                 mappings.Add(new SqlBulkCopyColumnMapping(dataTable.Columns[mapping.Key]!.ColumnName, mapping.Value));
             }
             return mappings;
+        }
+
+        /// <summary>
+        /// <c>DELETE FROM [table]</c>, with <c>WHERE condition</c> when there is one, for a flush before a bulk copy.
+        /// </summary>
+        /// <exception cref="ArgumentException">The table name is not a valid name, or the condition is empty or whitespace.</exception>
+        internal static string FlushSql(string tableName, string? flushWhereClauseCondition) =>
+            "DELETE FROM " + SqlIdentifier.Quote(tableName) + (flushWhereClauseCondition == null ? "" : " WHERE " + RequireCondition(flushWhereClauseCondition, nameof(flushWhereClauseCondition)));
+    }
+
+    public partial class SQLServerTransaction
+    {
+        /// <summary>
+        /// Performs a bulk copy operation to insert data from a DataTable into a SQL Server table, in this transaction, with an optional flush of the destination first.
+        /// </summary>
+        /// <inheritdoc cref="SQLServerInstance.BulkCopy(DataTable, string, bool, string?, Dictionary{string, object}?, int, int?, bool, IReadOnlyDictionary{string, string}?)" path="/param[@name!='useTransaction']|/exception"/>
+        public void BulkCopy(DataTable dataTable, string destinationTableName, bool flushTable = false, string? flushWhereClauseCondition = null, Dictionary<string, object>? flushParameters = null, int bulkCopyTimeout = 30, int? batchSize = null, IReadOnlyDictionary<string, string>? columnMappings = null)
+        {
+            string table = SqlIdentifier.Quote(destinationTableName);
+            var mappings = SQLServerInstance.BulkCopyColumnMappings(dataTable, columnMappings);
+            string deleteSQL = SQLServerInstance.FlushSql(destinationTableName, flushWhereClauseCondition);
+
+            if (flushTable)
+            {
+                using var command = new SqlCommand(deleteSQL, _connection, Transaction);
+                CommandParameters.Add(command, flushParameters);
+                command.ExecuteNonQuery();
+            }
+
+            using var bulkCopy = new SqlBulkCopy(_connection, SqlBulkCopyOptions.Default, Transaction);
+            bulkCopy.BulkCopyTimeout = bulkCopyTimeout;
+            if (batchSize.HasValue) bulkCopy.BatchSize = batchSize.Value;
+            bulkCopy.DestinationTableName = table;
+            mappings?.ForEach(mapping => bulkCopy.ColumnMappings.Add(mapping));
+            bulkCopy.WriteToServer(dataTable);
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿using Microsoft.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 using System.Data;
 
 namespace SQLServerInteraction
@@ -12,17 +12,19 @@ namespace SQLServerInteraction
         /// <param name="parameters">An optional array of SQL parameters to pass to the stored procedure.</param>
         public void ExecuteStoredProcedure(string storedProcedureName, SqlParameter[]? parameters = null)
         {
-            using var connection = new SqlConnection(_connectionString);
-            connection.Open();
+            using var work = Connect();
+            work.ExecuteStoredProcedure(storedProcedureName, parameters);
+        }
+    }
 
-            using var command = new SqlCommand(storedProcedureName, connection);
+    public partial class SQLServerTransaction
+    {
+        /// <inheritdoc cref="SQLServerInstance.ExecuteStoredProcedure(string, SqlParameter[])"/>
+        public void ExecuteStoredProcedure(string storedProcedureName, SqlParameter[]? parameters = null)
+        {
+            using var command = new SqlCommand(storedProcedureName, _connection, Transaction);
             command.CommandType = CommandType.StoredProcedure;
-
-            if (parameters != null)
-            {
-                command.Parameters.AddRange(parameters);
-            }
-
+            if (parameters != null) command.Parameters.AddRange(parameters);
             command.ExecuteNonQuery();
         }
     }

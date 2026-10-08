@@ -1,4 +1,4 @@
-﻿using Microsoft.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 
 namespace SQLServerInteraction
 {
@@ -13,36 +13,50 @@ namespace SQLServerInteraction
         /// <returns>A list of objects of type T populated with data from the query result.</returns>
         public List<T> ExecuteQueryToObjectList<T>(string sql, Dictionary<string, object>? parameters = null) where T : new()
         {
+            using var work = Connect();
+            return work.ExecuteQueryToObjectList<T>(sql, parameters);
+        }
+    }
+
+    public partial class SQLServerTransaction
+    {
+        /// <inheritdoc cref="SQLServerInstance.ExecuteQueryToObjectList{T}(string, Dictionary{string, object}?)"/>
+        public List<T> ExecuteQueryToObjectList<T>(string sql, Dictionary<string, object>? parameters = null) where T : new()
+        {
             var results = new List<T>();
 
-            using var connection = new SqlConnection(_connectionString);
-            connection.Open();
-
-            using var command = new SqlCommand(sql, connection);
-
+            using var command = new SqlCommand(sql, _connection, Transaction);
             CommandParameters.Add(command, parameters);
-
             using var reader = command.ExecuteReader();
 
             while (reader.Read())
             {
-                var obj = new T();
-                var properties = typeof(T).GetProperties();
-
-                foreach (var property in properties)
-                {
-                    string columnName = Attribute.GetCustomAttribute(property, typeof(ColumnAttribute)) is ColumnAttribute attribute ? attribute.Name : property.Name;
-
-                    if (!reader.IsDBNull(reader.GetOrdinal(columnName)))
-                    {
-                        property.SetValue(obj, Convert.ChangeType(reader[columnName], Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType));
-                    }
-                }
-
-                results.Add(obj);
+                results.Add(ReadObject<T>(reader));
             }
 
             return results;
+        }
+
+        /// <summary>
+        /// The current row as a <typeparamref name="T"/>: each public property set from
+        /// the column of its name or its <see cref="SQLServerInstance.ColumnAttribute"/> name,
+        /// converted to the property's type, with NULL leaving the property as constructed.
+        /// </summary>
+        private static T ReadObject<T>(SqlDataReader reader) where T : new()
+        {
+            var obj = new T();
+
+            foreach (var property in typeof(T).GetProperties())
+            {
+                string columnName = Attribute.GetCustomAttribute(property, typeof(SQLServerInstance.ColumnAttribute)) is SQLServerInstance.ColumnAttribute attribute ? attribute.Name : property.Name;
+
+                if (!reader.IsDBNull(reader.GetOrdinal(columnName)))
+                {
+                    property.SetValue(obj, Convert.ChangeType(reader[columnName], Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType));
+                }
+            }
+
+            return obj;
         }
     }
 }

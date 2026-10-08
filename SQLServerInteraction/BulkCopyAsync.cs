@@ -1,4 +1,4 @@
-﻿using Microsoft.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 using System.Data;
 
 namespace SQLServerInteraction
@@ -35,49 +35,40 @@ namespace SQLServerInteraction
         /// <param name="flushParameters">Parameters for <paramref name="flushWhereClauseCondition"/>, or null for none. Names work with or without the @, and null is sent as NULL.</param>
         /// <param name="columnMappings">Optional column mappings: each key is a column of <paramref name="dataTable"/> and its value the destination column it is copied to. Only mapped columns are copied. A destination is a column name, not SQL: SqlBulkCopy matches it to a destination column name exactly, case included, after removing brackets from a bracketed name ([Sales Region]); a name with a space needs none. A source column matches without regard to case. A destination the table does not have fails when the copy runs, after any flush; with useTransaction, the flush is rolled back. Null (the default) maps the columns by position.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
-        /// <exception cref="ArgumentException">The table name is not a valid name, <paramref name="flushWhereClauseCondition"/> is empty or whitespace, or <paramref name="columnMappings"/> is empty, names a column <paramref name="dataTable"/> does not have, or has an empty destination. Each is checked before a connection is opened, so nothing is deleted.</exception>
+        /// <exception cref="ArgumentException">The table name is not a valid name, <paramref name="flushWhereClauseCondition"/> is empty or whitespace, or <paramref name="columnMappings"/> is empty, names a column <paramref name="dataTable"/> does not have, or has an empty destination. Each is checked before anything runs, so nothing is deleted.</exception>
         public async Task BulkCopyAsync(DataTable dataTable, string destinationTableName, bool flushTable, string? flushWhereClauseCondition, Dictionary<string, object>? flushParameters, int bulkCopyTimeout = 30, int? batchSize = null, bool useTransaction = true, IReadOnlyDictionary<string, string>? columnMappings = null)
         {
+            using var work = useTransaction ? await BeginTransactionAsync() : await ConnectAsync();
+            await work.BulkCopyAsync(dataTable, destinationTableName, flushTable, flushWhereClauseCondition, flushParameters, bulkCopyTimeout, batchSize, columnMappings);
+            if (useTransaction) await work.CommitAsync();
+        }
+    }
+
+    public partial class SQLServerTransaction
+    {
+        /// <summary>
+        /// Asynchronously performs a bulk copy operation to insert data from a DataTable into a SQL Server table, in this transaction, with an optional flush of the destination first.
+        /// </summary>
+        /// <inheritdoc cref="SQLServerInstance.BulkCopyAsync(DataTable, string, bool, string?, Dictionary{string, object}?, int, int?, bool, IReadOnlyDictionary{string, string}?)" path="/param[@name!='useTransaction']|/returns|/exception"/>
+        public async Task BulkCopyAsync(DataTable dataTable, string destinationTableName, bool flushTable = false, string? flushWhereClauseCondition = null, Dictionary<string, object>? flushParameters = null, int bulkCopyTimeout = 30, int? batchSize = null, IReadOnlyDictionary<string, string>? columnMappings = null)
+        {
             string table = SqlIdentifier.Quote(destinationTableName);
-            var mappings = BulkCopyColumnMappings(dataTable, columnMappings);
-            string deleteSQL = "DELETE FROM " + table + (flushWhereClauseCondition == null ? "" : " WHERE " + RequireCondition(flushWhereClauseCondition, nameof(flushWhereClauseCondition)));
+            var mappings = SQLServerInstance.BulkCopyColumnMappings(dataTable, columnMappings);
+            string deleteSQL = SQLServerInstance.FlushSql(destinationTableName, flushWhereClauseCondition);
 
-            using var connection = new SqlConnection(_connectionString);
-            await connection.OpenAsync();
-
-            SqlTransaction? transaction = useTransaction ? connection.BeginTransaction() : null;
-
-            try
+            if (flushTable)
             {
-                using var bulkCopy = new SqlBulkCopy(connection, SqlBulkCopyOptions.Default, transaction);
-
-                bulkCopy.BulkCopyTimeout = bulkCopyTimeout;
-                if (batchSize.HasValue) bulkCopy.BatchSize = batchSize.Value;
-
-                if (flushTable)
-                {
-                    using var command = new SqlCommand(deleteSQL, connection, transaction);
-                    CommandParameters.Add(command, flushParameters);
-                    await command.ExecuteNonQueryAsync();
-                }
-
-                bulkCopy.DestinationTableName = table;
-                mappings?.ForEach(mapping => bulkCopy.ColumnMappings.Add(mapping));
-                await bulkCopy.WriteToServerAsync(dataTable);
-
-                transaction?.Commit();
+                using var command = new SqlCommand(deleteSQL, _connection, Transaction);
+                CommandParameters.Add(command, flushParameters);
+                await command.ExecuteNonQueryAsync();
             }
 
-            catch
-            {
-                transaction?.Rollback();
-                throw;
-            }
-
-            finally
-            {
-                transaction?.Dispose();
-            }
+            using var bulkCopy = new SqlBulkCopy(_connection, SqlBulkCopyOptions.Default, Transaction);
+            bulkCopy.BulkCopyTimeout = bulkCopyTimeout;
+            if (batchSize.HasValue) bulkCopy.BatchSize = batchSize.Value;
+            bulkCopy.DestinationTableName = table;
+            mappings?.ForEach(mapping => bulkCopy.ColumnMappings.Add(mapping));
+            await bulkCopy.WriteToServerAsync(dataTable);
         }
     }
 }

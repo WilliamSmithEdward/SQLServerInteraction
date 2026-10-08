@@ -1,4 +1,4 @@
-﻿using Microsoft.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 
 namespace SQLServerInteraction
 {
@@ -10,12 +10,17 @@ namespace SQLServerInteraction
         /// <param name="sql">The SQL command to execute.</param>
         public void ExecuteSQL(string sql)
         {
-            using var connection = new SqlConnection(_connectionString);
+            using var work = Connect();
+            work.ExecuteSQL(sql);
+        }
+    }
 
-            connection.Open();
-
-            using var command = new SqlCommand(sql, connection);
-
+    public partial class SQLServerTransaction
+    {
+        /// <inheritdoc cref="SQLServerInstance.ExecuteSQL(string)"/>
+        public void ExecuteSQL(string sql)
+        {
+            using var command = new SqlCommand(sql, _connection, Transaction);
             command.ExecuteNonQuery();
         }
     }

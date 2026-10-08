@@ -1,4 +1,4 @@
-﻿using Microsoft.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 
 namespace SQLServerInteraction
 {
@@ -12,13 +12,18 @@ namespace SQLServerInteraction
         /// <returns>A task representing the asynchronous operation.</returns>
         public async Task ExecuteNonQueryWithParametersAsync(string sql, Dictionary<string, object> parameters)
         {
-            using var connection = new SqlConnection(_connectionString);
-            await connection.OpenAsync();
+            using var work = await ConnectAsync();
+            await work.ExecuteNonQueryWithParametersAsync(sql, parameters);
+        }
+    }
 
-            using var command = new SqlCommand(sql, connection);
-
+    public partial class SQLServerTransaction
+    {
+        /// <inheritdoc cref="SQLServerInstance.ExecuteNonQueryWithParametersAsync(string, Dictionary{string, object})"/>
+        public async Task ExecuteNonQueryWithParametersAsync(string sql, Dictionary<string, object> parameters)
+        {
+            using var command = new SqlCommand(sql, _connection, Transaction);
             CommandParameters.Add(command, parameters);
-
             await command.ExecuteNonQueryAsync();
         }
     }

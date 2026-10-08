@@ -1,4 +1,4 @@
-﻿using Microsoft.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 
 namespace SQLServerInteraction
 {
@@ -12,18 +12,24 @@ namespace SQLServerInteraction
         /// <returns>A task representing the asynchronous operation that returns a list of objects of type <typeparamref name="T"/> containing the results of the query.</returns>
         public async Task<List<T>> ExecuteQueryAsync<T>(string sql)
         {
+            using var work = await ConnectAsync();
+            return await work.ExecuteQueryAsync<T>(sql);
+        }
+    }
+
+    public partial class SQLServerTransaction
+    {
+        /// <inheritdoc cref="SQLServerInstance.ExecuteQueryAsync{T}(string)"/>
+        public async Task<List<T>> ExecuteQueryAsync<T>(string sql)
+        {
             var results = new List<T>();
 
-            using var connection = new SqlConnection(_connectionString);
-            await connection.OpenAsync();
-
-            using var command = new SqlCommand(sql, connection);
+            using var command = new SqlCommand(sql, _connection, Transaction);
             using var reader = await command.ExecuteReaderAsync();
 
             while (await reader.ReadAsync())
             {
-                var result = reader[0];
-                results.Add(ValueConversion.ChangeQueryValue<T>(result));
+                results.Add(ValueConversion.ChangeQueryValue<T>(reader[0]));
             }
 
             return results;

@@ -1,4 +1,4 @@
-﻿using Microsoft.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 
 namespace SQLServerInteraction
 {
@@ -12,14 +12,18 @@ namespace SQLServerInteraction
         /// <returns>The result of the query as a single value of type T, or the default value of T if the result is null or DBNull.Value.</returns>
         public T? ExecuteScalar<T>(string sql)
         {
-            using var connection = new SqlConnection(_connectionString);
-            connection.Open();
+            using var work = Connect();
+            return work.ExecuteScalar<T>(sql);
+        }
+    }
 
-            using var command = new SqlCommand(sql, connection);
-
-            var result = command.ExecuteScalar();
-
-            return ValueConversion.ChangeType<T>(result);
+    public partial class SQLServerTransaction
+    {
+        /// <inheritdoc cref="SQLServerInstance.ExecuteScalar{T}(string)"/>
+        public T? ExecuteScalar<T>(string sql)
+        {
+            using var command = new SqlCommand(sql, _connection, Transaction);
+            return ValueConversion.ChangeType<T>(command.ExecuteScalar());
         }
     }
 }

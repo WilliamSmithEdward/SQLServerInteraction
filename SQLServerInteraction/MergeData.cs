@@ -18,39 +18,17 @@ namespace SQLServerInteraction
         /// <exception cref="ArgumentException">A table or column name is not a valid name, there are no key columns, or a column is named in both lists.</exception>
         public int MergeData(string sourceTableName, string targetTableName, IEnumerable<string> keyColumns, IEnumerable<string> valueColumns, bool deleteUnmatched = false, bool useTransaction = true)
         {
-            string sql = MergeSql(sourceTableName, targetTableName, keyColumns, valueColumns, deleteUnmatched);
-
-            using var connection = new SqlConnection(_connectionString);
-            connection.Open();
-
-            SqlTransaction? transaction = useTransaction ? connection.BeginTransaction() : null;
-
-            try
-            {
-                using var command = new SqlCommand(sql, connection, transaction);
-                int rows = command.ExecuteNonQuery();
-
-                transaction?.Commit();
-                return rows;
-            }
-
-            catch
-            {
-                transaction?.Rollback();
-                throw;
-            }
-
-            finally
-            {
-                transaction?.Dispose();
-            }
+            using var work = useTransaction ? BeginTransaction() : Connect();
+            int rows = work.MergeData(sourceTableName, targetTableName, keyColumns, valueColumns, deleteUnmatched);
+            if (useTransaction) work.Commit();
+            return rows;
         }
 
         /// <summary>
         /// The MERGE statement for the caller's names, each quoted as an identifier.
         /// </summary>
         /// <exception cref="ArgumentException">A name is not a valid name, there are no key columns, or a column is named in both lists.</exception>
-        private static string MergeSql(string sourceTableName, string targetTableName, IEnumerable<string> keyColumns, IEnumerable<string> valueColumns, bool deleteUnmatched)
+        internal static string MergeSql(string sourceTableName, string targetTableName, IEnumerable<string> keyColumns, IEnumerable<string> valueColumns, bool deleteUnmatched)
         {
             var keys = QuoteColumns(keyColumns, nameof(keyColumns));
             var values = valueColumns.Select(name => SqlIdentifier.Quote(name, maxParts: 1)).ToList();
@@ -91,6 +69,21 @@ namespace SQLServerInteraction
                 sql.Append(" WHEN NOT MATCHED BY SOURCE THEN DELETE");
 
             return sql.Append(';').ToString();
+        }
+    }
+
+    public partial class SQLServerTransaction
+    {
+        /// <summary>
+        /// Merges the rows of one SQL Server table into another with a MERGE statement, in this transaction: a target row whose key columns match a source row is updated, a source row with no match is inserted, and, when asked, a target row with no match is deleted.
+        /// </summary>
+        /// <inheritdoc cref="SQLServerInstance.MergeData(string, string, IEnumerable{string}, IEnumerable{string}, bool, bool)" path="/param[@name!='useTransaction']|/returns|/exception"/>
+        public int MergeData(string sourceTableName, string targetTableName, IEnumerable<string> keyColumns, IEnumerable<string> valueColumns, bool deleteUnmatched = false)
+        {
+            string sql = SQLServerInstance.MergeSql(sourceTableName, targetTableName, keyColumns, valueColumns, deleteUnmatched);
+
+            using var command = new SqlCommand(sql, _connection, Transaction);
+            return command.ExecuteNonQuery();
         }
     }
 }

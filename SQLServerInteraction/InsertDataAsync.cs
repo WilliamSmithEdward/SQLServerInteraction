@@ -1,4 +1,4 @@
-﻿using Microsoft.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 
 namespace SQLServerInteraction
 {
@@ -13,13 +13,20 @@ namespace SQLServerInteraction
         /// <exception cref="ArgumentException">A table or column name is not a valid name, or there are no values.</exception>
         public async Task InsertDataAsync(string sqlServerTableName, Dictionary<string, object> values)
         {
-            string sql = InsertSql(sqlServerTableName, values.Keys);
+            using var work = await ConnectAsync();
+            await work.InsertDataAsync(sqlServerTableName, values);
+        }
+    }
 
-            using var connection = new SqlConnection(_connectionString);
-            await connection.OpenAsync();
+    public partial class SQLServerTransaction
+    {
+        /// <inheritdoc cref="SQLServerInstance.InsertDataAsync(string, Dictionary{string, object})"/>
+        public async Task InsertDataAsync(string sqlServerTableName, Dictionary<string, object> values)
+        {
+            string sql = SQLServerInstance.InsertSql(sqlServerTableName, values.Keys);
 
-            using var command = new SqlCommand(sql, connection);
-            AddValueParameters(command, values.Values);
+            using var command = new SqlCommand(sql, _connection, Transaction);
+            SQLServerInstance.AddValueParameters(command, values.Values);
 
             await command.ExecuteNonQueryAsync();
         }

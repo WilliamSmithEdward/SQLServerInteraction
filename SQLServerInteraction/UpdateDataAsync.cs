@@ -1,4 +1,4 @@
-﻿using Microsoft.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 
 namespace SQLServerInteraction
 {
@@ -28,13 +28,26 @@ namespace SQLServerInteraction
         /// <exception cref="ArgumentException">A table or column name is not a valid name, there are no values, or <paramref name="condition"/> is empty or whitespace.</exception>
         public async Task UpdateDataAsync(string sqlServerTableName, Dictionary<string, object> valuesToUpdate, string condition, Dictionary<string, object>? parameters)
         {
-            string sql = UpdateSql(sqlServerTableName, valuesToUpdate.Keys, condition);
+            using var work = await ConnectAsync();
+            await work.UpdateDataAsync(sqlServerTableName, valuesToUpdate, condition, parameters);
+        }
+    }
 
-            using var connection = new SqlConnection(_connectionString);
-            await connection.OpenAsync();
+    public partial class SQLServerTransaction
+    {
+        /// <inheritdoc cref="SQLServerInstance.UpdateDataAsync(string, Dictionary{string, object}, string)"/>
+        public Task UpdateDataAsync(string sqlServerTableName, Dictionary<string, object> valuesToUpdate, string condition = "")
+        {
+            return UpdateDataAsync(sqlServerTableName, valuesToUpdate, condition, null);
+        }
 
-            using var command = new SqlCommand(sql, connection);
-            AddValueParameters(command, valuesToUpdate.Values);
+        /// <inheritdoc cref="SQLServerInstance.UpdateDataAsync(string, Dictionary{string, object}, string, Dictionary{string, object}?)"/>
+        public async Task UpdateDataAsync(string sqlServerTableName, Dictionary<string, object> valuesToUpdate, string condition, Dictionary<string, object>? parameters)
+        {
+            string sql = SQLServerInstance.UpdateSql(sqlServerTableName, valuesToUpdate.Keys, condition);
+
+            using var command = new SqlCommand(sql, _connection, Transaction);
+            SQLServerInstance.AddValueParameters(command, valuesToUpdate.Values);
             CommandParameters.Add(command, parameters);
 
             await command.ExecuteNonQueryAsync();
