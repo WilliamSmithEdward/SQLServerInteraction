@@ -36,13 +36,13 @@ namespace SQLServerInteraction
     public partial class SQLServerTransaction
     {
         /// <inheritdoc cref="SQLServerInstance.UpdateDataAsync(string, Dictionary{string, object}, string)"/>
-        public Task UpdateDataAsync(string sqlServerTableName, Dictionary<string, object> valuesToUpdate, string condition = "")
+        public Task UpdateDataAsync(string sqlServerTableName, Dictionary<string, object> valuesToUpdate, string condition = "", CancellationToken cancellationToken = default)
         {
-            return UpdateDataAsync(sqlServerTableName, valuesToUpdate, condition, null);
+            return UpdateDataAsync(sqlServerTableName, valuesToUpdate, condition, null, cancellationToken);
         }
 
         /// <inheritdoc cref="SQLServerInstance.UpdateDataAsync(string, Dictionary{string, object}, string, Dictionary{string, object}?)"/>
-        public async Task UpdateDataAsync(string sqlServerTableName, Dictionary<string, object> valuesToUpdate, string condition, Dictionary<string, object>? parameters)
+        public async Task UpdateDataAsync(string sqlServerTableName, Dictionary<string, object> valuesToUpdate, string condition, Dictionary<string, object>? parameters, CancellationToken cancellationToken = default)
         {
             string sql = SQLServerInstance.UpdateSql(sqlServerTableName, valuesToUpdate.Keys, condition);
 
@@ -50,7 +50,7 @@ namespace SQLServerInteraction
             SQLServerInstance.AddValueParameters(command, valuesToUpdate.Values);
             CommandParameters.Add(command, parameters);
 
-            await command.ExecuteNonQueryAsync();
+            await command.ExecuteNonQueryAsync(cancellationToken);
         }
     }
 }

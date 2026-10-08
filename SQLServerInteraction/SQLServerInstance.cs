@@ -57,21 +57,23 @@ namespace SQLServerInteraction
         /// <summary>
         /// Asynchronously opens a connection and begins a transaction on it, with SqlClient's default isolation level (read committed). The data methods of the returned object run in that transaction until <see cref="SQLServerTransaction.CommitAsync"/>; disposing it without a commit rolls back.
         /// </summary>
+        /// <param name="cancellationToken">A token to cancel opening the connection and beginning the transaction.</param>
         /// <returns>A task whose result is the transaction, which owns the connection.</returns>
-        public Task<SQLServerTransaction> BeginTransactionAsync() => BeginTransactionAsync(IsolationLevel.Unspecified);
+        public Task<SQLServerTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default) => BeginTransactionAsync(IsolationLevel.Unspecified, cancellationToken);
 
         /// <summary>
         /// Asynchronously opens a connection and begins a transaction on it with the given isolation level. The data methods of the returned object run in that transaction until <see cref="SQLServerTransaction.CommitAsync"/>; disposing it without a commit rolls back.
         /// </summary>
         /// <param name="isolationLevel">The transaction's isolation level. <see cref="IsolationLevel.Unspecified"/> takes SqlClient's default, read committed.</param>
+        /// <param name="cancellationToken">A token to cancel opening the connection and beginning the transaction.</param>
         /// <returns>A task whose result is the transaction, which owns the connection.</returns>
-        public async Task<SQLServerTransaction> BeginTransactionAsync(IsolationLevel isolationLevel)
+        public async Task<SQLServerTransaction> BeginTransactionAsync(IsolationLevel isolationLevel, CancellationToken cancellationToken = default)
         {
             var connection = new SqlConnection(_connectionString);
             try
             {
-                await connection.OpenAsync();
-                return new SQLServerTransaction(connection, (SqlTransaction)await connection.BeginTransactionAsync(isolationLevel));
+                await connection.OpenAsync(cancellationToken);
+                return new SQLServerTransaction(connection, (SqlTransaction)await connection.BeginTransactionAsync(isolationLevel, cancellationToken));
             }
             catch
             {

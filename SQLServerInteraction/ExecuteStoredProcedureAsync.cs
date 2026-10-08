@@ -21,12 +21,12 @@ namespace SQLServerInteraction
     public partial class SQLServerTransaction
     {
         /// <inheritdoc cref="SQLServerInstance.ExecuteStoredProcedureAsync(string, SqlParameter[])"/>
-        public async Task ExecuteStoredProcedureAsync(string storedProcedureName, SqlParameter[]? parameters = null)
+        public async Task ExecuteStoredProcedureAsync(string storedProcedureName, SqlParameter[]? parameters = null, CancellationToken cancellationToken = default)
         {
             using var command = new SqlCommand(storedProcedureName, _connection, Transaction);
             command.CommandType = CommandType.StoredProcedure;
             if (parameters != null) command.Parameters.AddRange(parameters);
-            await command.ExecuteNonQueryAsync();
+            await command.ExecuteNonQueryAsync(cancellationToken);
         }
     }
 }

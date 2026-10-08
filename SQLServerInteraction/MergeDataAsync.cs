@@ -30,12 +30,12 @@ namespace SQLServerInteraction
         /// Asynchronously merges the rows of one SQL Server table into another with a MERGE statement, in this transaction: a target row whose key columns match a source row is updated, a source row with no match is inserted, and, when asked, a target row with no match is deleted.
         /// </summary>
         /// <inheritdoc cref="SQLServerInstance.MergeDataAsync(string, string, IEnumerable{string}, IEnumerable{string}, bool, bool)" path="/param[@name!='useTransaction']|/returns|/exception"/>
-        public async Task<int> MergeDataAsync(string sourceTableName, string targetTableName, IEnumerable<string> keyColumns, IEnumerable<string> valueColumns, bool deleteUnmatched = false)
+        public async Task<int> MergeDataAsync(string sourceTableName, string targetTableName, IEnumerable<string> keyColumns, IEnumerable<string> valueColumns, bool deleteUnmatched = false, CancellationToken cancellationToken = default)
         {
             string sql = SQLServerInstance.MergeSql(sourceTableName, targetTableName, keyColumns, valueColumns, deleteUnmatched);
 
             using var command = new SqlCommand(sql, _connection, Transaction);
-            return await command.ExecuteNonQueryAsync();
+            return await command.ExecuteNonQueryAsync(cancellationToken);
         }
     }
 }

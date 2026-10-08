@@ -22,7 +22,7 @@ namespace SQLServerInteraction
     public partial class SQLServerTransaction
     {
         /// <inheritdoc cref="SQLServerInstance.InsertDataAsync{T}(T, string)"/>
-        public async Task InsertDataAsync<T>(T data, string sqlServerTableName) where T : class
+        public async Task InsertDataAsync<T>(T data, string sqlServerTableName, CancellationToken cancellationToken = default) where T : class
         {
             var properties = SQLServerInstance.InsertProperties<T>();
             string sql = SQLServerInstance.InsertSql(sqlServerTableName, properties.Select(p => p.Column));
@@ -30,7 +30,7 @@ namespace SQLServerInteraction
             using var command = new SqlCommand(sql, _connection, Transaction);
             SQLServerInstance.AddValueParameters(command, properties.Select(p => p.Property.GetValue(data)));
 
-            await command.ExecuteNonQueryAsync();
+            await command.ExecuteNonQueryAsync(cancellationToken);
         }
     }
 }

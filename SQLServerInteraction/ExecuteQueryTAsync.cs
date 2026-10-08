@@ -20,14 +20,14 @@ namespace SQLServerInteraction
     public partial class SQLServerTransaction
     {
         /// <inheritdoc cref="SQLServerInstance.ExecuteQueryAsync{T}(string)"/>
-        public async Task<List<T>> ExecuteQueryAsync<T>(string sql)
+        public async Task<List<T>> ExecuteQueryAsync<T>(string sql, CancellationToken cancellationToken = default)
         {
             var results = new List<T>();
 
             using var command = new SqlCommand(sql, _connection, Transaction);
-            using var reader = await command.ExecuteReaderAsync();
+            using var reader = await command.ExecuteReaderAsync(cancellationToken);
 
-            while (await reader.ReadAsync())
+            while (await reader.ReadAsync(cancellationToken))
             {
                 results.Add(ValueConversion.ChangeQueryValue<T>(reader[0]));
             }

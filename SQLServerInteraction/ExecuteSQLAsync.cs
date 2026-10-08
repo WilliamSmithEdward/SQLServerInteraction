@@ -19,10 +19,10 @@ namespace SQLServerInteraction
     public partial class SQLServerTransaction
     {
         /// <inheritdoc cref="SQLServerInstance.ExecuteSQLAsync(string)"/>
-        public async Task ExecuteSQLAsync(string sql)
+        public async Task ExecuteSQLAsync(string sql, CancellationToken cancellationToken = default)
         {
             using var command = new SqlCommand(sql, _connection, Transaction);
-            await command.ExecuteNonQueryAsync();
+            await command.ExecuteNonQueryAsync(cancellationToken);
         }
     }
 }

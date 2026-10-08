@@ -32,13 +32,13 @@ namespace SQLServerInteraction
         /// Asynchronously bulk copies a DataTable into a temporary table and merges it into a SQL Server table, in this transaction: a destination row whose key columns match a DataTable row is updated, a DataTable row with no match is inserted, and, when asked, a destination row with no match is deleted.
         /// </summary>
         /// <inheritdoc cref="SQLServerInstance.BulkMergeAsync(DataTable, string, IEnumerable{string}, bool, int, int?, bool)" path="/param[@name!='useTransaction']|/returns|/exception"/>
-        public async Task<int> BulkMergeAsync(DataTable dataTable, string destinationTableName, IEnumerable<string> keyColumns, bool deleteUnmatched = false, int timeout = 30, int? batchSize = null)
+        public async Task<int> BulkMergeAsync(DataTable dataTable, string destinationTableName, IEnumerable<string> keyColumns, bool deleteUnmatched = false, int timeout = 30, int? batchSize = null, CancellationToken cancellationToken = default)
         {
             var (stagingSql, mergeSql) = SQLServerInstance.BulkMergeSql(dataTable, destinationTableName, keyColumns, deleteUnmatched);
 
             using (var staging = new SqlCommand(stagingSql, _connection, Transaction))
             {
-                await staging.ExecuteNonQueryAsync();
+                await staging.ExecuteNonQueryAsync(cancellationToken);
             }
 
             using (var bulkCopy = new SqlBulkCopy(_connection, SqlBulkCopyOptions.Default, Transaction))
@@ -46,12 +46,12 @@ namespace SQLServerInteraction
                 bulkCopy.BulkCopyTimeout = timeout;
                 if (batchSize.HasValue) bulkCopy.BatchSize = batchSize.Value;
                 bulkCopy.DestinationTableName = SQLServerInstance.BulkMergeStagingTable;
-                await bulkCopy.WriteToServerAsync(dataTable);
+                await bulkCopy.WriteToServerAsync(dataTable, cancellationToken);
             }
 
             using var merge = new SqlCommand(mergeSql, _connection, Transaction);
             merge.CommandTimeout = timeout;
-            return await merge.ExecuteNonQueryAsync();
+            return await merge.ExecuteNonQueryAsync(cancellationToken);
         }
     }
 }

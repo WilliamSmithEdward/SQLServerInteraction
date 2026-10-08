@@ -20,11 +20,11 @@ namespace SQLServerInteraction
     public partial class SQLServerTransaction
     {
         /// <inheritdoc cref="SQLServerInstance.ExecuteParameterizedQueryAsync(string, SqlParameter[])"/>
-        public async Task ExecuteParameterizedQueryAsync(string sql, SqlParameter[] parameters)
+        public async Task ExecuteParameterizedQueryAsync(string sql, SqlParameter[] parameters, CancellationToken cancellationToken = default)
         {
             using var command = new SqlCommand(sql, _connection, Transaction);
             command.Parameters.AddRange(parameters);
-            await command.ExecuteNonQueryAsync();
+            await command.ExecuteNonQueryAsync(cancellationToken);
         }
     }
 }

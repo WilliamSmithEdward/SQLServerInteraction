@@ -34,19 +34,19 @@ namespace SQLServerInteraction
     public partial class SQLServerTransaction
     {
         /// <inheritdoc cref="SQLServerInstance.DeleteDataAsync(string, string)"/>
-        public Task DeleteDataAsync(string sqlServerTableName, string condition = "")
+        public Task DeleteDataAsync(string sqlServerTableName, string condition = "", CancellationToken cancellationToken = default)
         {
-            return DeleteDataAsync(sqlServerTableName, condition, null);
+            return DeleteDataAsync(sqlServerTableName, condition, null, cancellationToken);
         }
 
         /// <inheritdoc cref="SQLServerInstance.DeleteDataAsync(string, string, Dictionary{string, object}?)"/>
-        public async Task DeleteDataAsync(string sqlServerTableName, string condition, Dictionary<string, object>? parameters)
+        public async Task DeleteDataAsync(string sqlServerTableName, string condition, Dictionary<string, object>? parameters, CancellationToken cancellationToken = default)
         {
             string sql = SQLServerInstance.DeleteSql(sqlServerTableName, condition);
 
             using var command = new SqlCommand(sql, _connection, Transaction);
             CommandParameters.Add(command, parameters);
-            await command.ExecuteNonQueryAsync();
+            await command.ExecuteNonQueryAsync(cancellationToken);
         }
     }
 }
