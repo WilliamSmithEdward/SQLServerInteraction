@@ -87,8 +87,15 @@ for net9.0. What an agent working here must not break:
   need nothing. The integration tests need SQL Server and are skipped, not
   passed, without one. `scripts/test/run-integration-tests.sh` builds the image
   pinned in `.github/test/mssql/Dockerfile`, starts it on 127.0.0.1 with an
-  SA password made for the run, waits for it, runs `dotnet test` with any
-  arguments you give it, and removes the container; CI runs it with
-  `-c Release --no-build --fail-skips on`, so a skipped test fails there. The
-  tests connect to nothing but that container. A fix comes with a test that
-  fails without it.
+  SA password made for the run, waits for it, runs `dotnet test` on the
+  solution, one test project at a time, with any arguments you give it, and
+  removes the container; CI runs it with `-c Release --no-build --fail-skips on`,
+  so a skipped test fails there. The tests connect to nothing but that
+  container. A fix comes with a test that fails without it.
+- **The 1.x comparison.** `SQLServerInteraction.Tests/Compatibility` holds a
+  catalogue of scenarios, each with the outcome 1.1.1 gives and the outcome
+  the current library gives. `SQLServerInteraction.V1Tests` links those
+  sources and runs them on the 1.1.1 package from nuget.org, on the
+  dependencies it shipped with; the main project runs them on the source.
+  A behavior change that callers upgrading from 1.x would notice gets a
+  scenario, with both columns observed, not guessed.

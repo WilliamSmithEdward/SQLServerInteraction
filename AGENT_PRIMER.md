@@ -303,6 +303,13 @@ front of the builder's own SQL.
   integration tests need the container that
   `scripts/test/run-integration-tests.sh` starts, and are skipped without it,
   which CI treats as failure. A fix comes with a test that fails without it.
+- The 1.x comparison: `SQLServerInteraction.Tests/Compatibility` is a
+  catalogue of scenarios, each written once against a small adapter, with the
+  outcome 1.1.1 gives and the outcome the current library gives side by side.
+  `SQLServerInteraction.V1Tests` runs the catalogue on the 1.1.1 package from
+  nuget.org; the main project runs it on the source. A change that an
+  upgrading caller would notice gets a scenario there, so section 14 stays
+  backed by observation.
 - Release: `PackageVersion` and `AssemblyVersion` in the csproj, a
   `## [X.Y.Z] - date` section in `CHANGELOG.md`, then the owner pushes the
   `vX.Y.Z` tag. The README is packed into the package as its readme.
@@ -331,7 +338,9 @@ In 3.0.0:
   object with savepoints, and the index methods on it.
 
 Everything below arrived in 2.0.0 and still holds. Methods are named here as
-they are in 3.0.0; in 2.0.0 each also had a synchronous twin.
+they are in 3.0.0; in 2.0.0 each also had a synchronous twin. The behavior
+changes among them are observed, not recalled: the compatibility catalogue
+(section 13) runs each on the 1.1.1 package and on the current library.
 
 Names and SQL:
 

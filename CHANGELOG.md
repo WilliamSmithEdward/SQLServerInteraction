@@ -27,6 +27,7 @@ The library is async only, every method takes a cancellation token, and there is
 * `BeginTransactionAsync` returns a `SQLServerTransaction`: one connection and one transaction on which the queries, commands, inserts, updates, deletes, merges and bulk copies run together, with the same signatures as on `SQLServerInstance`. `CommitAsync` commits; disposing without a commit rolls back. It takes an optional `IsolationLevel`.
 * `ExecuteTransactionAsync` now runs through that object. Its behavior is unchanged.
 * `SQLServerTransaction` also carries `IndexCreateAsync` and `IndexDropAsync`, and savepoints: `SaveAsync(name)` marks one and `RollbackToAsync(name)` undoes the work since it while the transaction stays open.
+* The repository has a compatibility catalogue: scenarios that run on the 1.1.1 package and on the current library in CI, recording what each does, so every behavior change listed for 2.0.0 and 3.0.0 is observed on both.
 
 ## [2.0.1] - 2026-10-04
 

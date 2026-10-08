@@ -59,4 +59,6 @@ until docker exec --env SQLCMDPASSWORD "$container" \
 done
 echo "SQL Server is ready."
 
-dotnet test SQLServerInteraction.sln "$@"
+# One test project at a time: they share the one container, and running both at
+# once has made the main project wait past its connect timeout for a connection.
+dotnet test SQLServerInteraction.sln --max-parallel-test-modules 1 "$@"

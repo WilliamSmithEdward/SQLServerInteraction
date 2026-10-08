@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Runs the compatibility scenarios in SQLServerInteraction.Tests/Compatibility
+    against the last 1.x release of the package, from nuget.org, so that each
+    recorded difference between 1.x and the current library is observed on the
+    old code, not only asserted on the new one. The scenario sources and the
+    test server plumbing are linked from the main test project; only the
+    adapter over the 1.1.1 API lives here.
+
+    The package runs on the dependencies it shipped with (Microsoft.Data.SqlClient
+    5.2.1, Azure.Identity 1.12.0 and what they bring). Its QueryBuilder calls a
+    Microsoft.IdentityModel.Tokens helper that later versions made internal, so
+    lifting those dependencies to the current versions breaks the old code with
+    MethodAccessException. The solution's dependency audit covers this graph too.
+  -->
+
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);xUnit1051</NoWarn>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <OutputType>Exe</OutputType>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SQLServerInteraction" Version="1.1.1" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
+    <PackageReference Include="xunit.v3" Version="4.0.1" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\SQLServerInteraction.Tests\TestServer.cs" Link="TestServer.cs" />
+    <Compile Include="..\SQLServerInteraction.Tests\DatabaseFixture.cs" Link="DatabaseFixture.cs" />
+    <Compile Include="..\SQLServerInteraction.Tests\IntegrationTest.cs" Link="IntegrationTest.cs" />
+    <Compile Include="..\SQLServerInteraction.Tests\Compatibility\ICompatibilityDb.cs" Link="Compatibility\ICompatibilityDb.cs" />
+    <Compile Include="..\SQLServerInteraction.Tests\Compatibility\CompatibilityScenarios.cs" Link="Compatibility\CompatibilityScenarios.cs" />
+    <Compile Include="..\SQLServerInteraction.Tests\Compatibility\CompatibilityScenarioTests.cs" Link="Compatibility\CompatibilityScenarioTests.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>
