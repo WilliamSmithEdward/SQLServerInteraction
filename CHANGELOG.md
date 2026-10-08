@@ -9,7 +9,9 @@ with the date nuget.org records for each upload. Neither nuget.org nor the
 repository carried release notes for them. Versions 1.0.0 to 1.0.18 are
 unlisted on nuget.org.
 
-## [2.1.0] - 2026-10-08
+## [3.0.0] - 2026-10-08
+
+A merge operation, a bulk copy that merges, and a transaction object on which the data methods run together. No existing public signature or behavior changes; the major version marks the size of the new surface. `AGENT_PRIMER.md` describes the whole library and every breaking change since 1.x.
 
 ### Additions
 
