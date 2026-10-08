@@ -20,13 +20,14 @@ namespace SQLServerInteraction
     public partial class SQLServerTransaction
     {
         /// <inheritdoc cref="SQLServerInstance.ExecuteQueryAsync(string)"/>
-        public async Task<DataTable> ExecuteQueryAsync(string sql)
+        public async Task<DataTable> ExecuteQueryAsync(string sql, CancellationToken cancellationToken = default)
         {
             var dataTable = new DataTable();
 
             using var command = new SqlCommand(sql, _connection, Transaction);
             using var adapter = new SqlDataAdapter(command);
-            await Task.Run(() => adapter.Fill(dataTable));
+            using var registration = cancellationToken.Register(command.Cancel);
+            await Task.Run(() => adapter.Fill(dataTable), cancellationToken);
 
             return dataTable;
         }

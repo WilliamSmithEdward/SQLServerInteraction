@@ -50,7 +50,7 @@ namespace SQLServerInteraction
         /// Asynchronously performs a bulk copy operation to insert data from a DataTable into a SQL Server table, in this transaction, with an optional flush of the destination first.
         /// </summary>
         /// <inheritdoc cref="SQLServerInstance.BulkCopyAsync(DataTable, string, bool, string?, Dictionary{string, object}?, int, int?, bool, IReadOnlyDictionary{string, string}?)" path="/param[@name!='useTransaction']|/returns|/exception"/>
-        public async Task BulkCopyAsync(DataTable dataTable, string destinationTableName, bool flushTable = false, string? flushWhereClauseCondition = null, Dictionary<string, object>? flushParameters = null, int bulkCopyTimeout = 30, int? batchSize = null, IReadOnlyDictionary<string, string>? columnMappings = null)
+        public async Task BulkCopyAsync(DataTable dataTable, string destinationTableName, bool flushTable = false, string? flushWhereClauseCondition = null, Dictionary<string, object>? flushParameters = null, int bulkCopyTimeout = 30, int? batchSize = null, IReadOnlyDictionary<string, string>? columnMappings = null, CancellationToken cancellationToken = default)
         {
             string table = SqlIdentifier.Quote(destinationTableName);
             var mappings = SQLServerInstance.BulkCopyColumnMappings(dataTable, columnMappings);
@@ -60,7 +60,7 @@ namespace SQLServerInteraction
             {
                 using var command = new SqlCommand(deleteSQL, _connection, Transaction);
                 CommandParameters.Add(command, flushParameters);
-                await command.ExecuteNonQueryAsync();
+                await command.ExecuteNonQueryAsync(cancellationToken);
             }
 
             using var bulkCopy = new SqlBulkCopy(_connection, SqlBulkCopyOptions.Default, Transaction);
@@ -68,7 +68,7 @@ namespace SQLServerInteraction
             if (batchSize.HasValue) bulkCopy.BatchSize = batchSize.Value;
             bulkCopy.DestinationTableName = table;
             mappings?.ForEach(mapping => bulkCopy.ColumnMappings.Add(mapping));
-            await bulkCopy.WriteToServerAsync(dataTable);
+            await bulkCopy.WriteToServerAsync(dataTable, cancellationToken);
         }
     }
 }

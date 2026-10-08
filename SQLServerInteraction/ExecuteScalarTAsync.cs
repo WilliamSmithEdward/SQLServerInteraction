@@ -20,10 +20,10 @@ namespace SQLServerInteraction
     public partial class SQLServerTransaction
     {
         /// <inheritdoc cref="SQLServerInstance.ExecuteScalarAsync{T}(string)"/>
-        public async Task<T?> ExecuteScalarAsync<T>(string sql)
+        public async Task<T?> ExecuteScalarAsync<T>(string sql, CancellationToken cancellationToken = default)
         {
             using var command = new SqlCommand(sql, _connection, Transaction);
-            return ValueConversion.ChangeType<T>(await command.ExecuteScalarAsync());
+            return ValueConversion.ChangeType<T>(await command.ExecuteScalarAsync(cancellationToken));
         }
     }
 }

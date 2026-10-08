@@ -21,15 +21,15 @@ namespace SQLServerInteraction
     public partial class SQLServerTransaction
     {
         /// <inheritdoc cref="SQLServerInstance.ExecuteQueryToObjectListAsync{T}(string, Dictionary{string, object}?)"/>
-        public async Task<List<T>> ExecuteQueryToObjectListAsync<T>(string sql, Dictionary<string, object>? parameters = null) where T : new()
+        public async Task<List<T>> ExecuteQueryToObjectListAsync<T>(string sql, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default) where T : new()
         {
             var results = new List<T>();
 
             using var command = new SqlCommand(sql, _connection, Transaction);
             CommandParameters.Add(command, parameters);
-            using var reader = await command.ExecuteReaderAsync();
+            using var reader = await command.ExecuteReaderAsync(cancellationToken);
 
-            while (await reader.ReadAsync())
+            while (await reader.ReadAsync(cancellationToken))
             {
                 results.Add(ReadObject<T>(reader));
             }

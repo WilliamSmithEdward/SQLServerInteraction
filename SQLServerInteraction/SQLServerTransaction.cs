@@ -5,16 +5,28 @@ namespace SQLServerInteraction
     /// <summary>
     /// One connection with one open transaction, on which the data methods of
     /// <see cref="SQLServerInstance"/> run together: queries, commands, inserts,
-    /// updates, deletes, merges and bulk copies. Get one from
+    /// updates, deletes, merges, bulk copies and index changes. Get one from
     /// <see cref="SQLServerInstance.BeginTransaction()"/>, call the methods, then
     /// <see cref="Commit"/>. Disposing it without a commit rolls everything back
     /// and closes the connection, so a <c>using</c> block is enough on failure.
     /// </summary>
     /// <remarks>
+    /// <para>
+    /// After an exception from any method, roll back, or let the <c>using</c> block
+    /// do it. Do not catch the exception and carry on to <see cref="Commit"/>: SQL
+    /// Server fails only the statement for some errors, such as a constraint
+    /// violation, and leaves the transaction open, so the commit would keep the
+    /// work done before the failure. To undo part of a transaction on purpose,
+    /// use <see cref="Save"/> and <see cref="RollbackTo"/>.
+    /// </para>
+    /// <para>
     /// Every method throws <see cref="InvalidOperationException"/> after the
     /// transaction is committed or rolled back, and
-    /// <see cref="ObjectDisposedException"/> after it is disposed. The object is
-    /// not thread-safe: use it from one thread, or one async flow, at a time.
+    /// <see cref="ObjectDisposedException"/> after it is disposed. Each async
+    /// method takes an optional <see cref="CancellationToken"/> as its last
+    /// argument. The object is not thread-safe: use it from one thread, or one
+    /// async flow, at a time.
+    /// </para>
     /// </remarks>
     public sealed partial class SQLServerTransaction : IDisposable, IAsyncDisposable
     {
@@ -49,7 +61,7 @@ namespace SQLServerInteraction
             }
         }
 
-        /// <summary>The open transaction, for a commit or rollback.</summary>
+        /// <summary>The open transaction, for a commit, rollback or savepoint.</summary>
         private SqlTransaction OpenTransaction =>
             Transaction ?? throw new InvalidOperationException("There is no transaction to complete.");
 
@@ -67,12 +79,13 @@ namespace SQLServerInteraction
         /// <summary>
         /// Asynchronously commits the transaction. The connection stays open until the object is disposed, but no method can run after this.
         /// </summary>
+        /// <param name="cancellationToken">A token to cancel the commit.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
         /// <exception cref="InvalidOperationException">The transaction was already committed or rolled back.</exception>
         /// <exception cref="ObjectDisposedException">The object was disposed.</exception>
-        public async Task CommitAsync()
+        public async Task CommitAsync(CancellationToken cancellationToken = default)
         {
-            await OpenTransaction.CommitAsync();
+            await OpenTransaction.CommitAsync(cancellationToken);
             _completed = true;
         }
 
@@ -90,13 +103,89 @@ namespace SQLServerInteraction
         /// <summary>
         /// Asynchronously rolls the transaction back. Disposing without a commit does the same, so this is only needed to roll back early.
         /// </summary>
+        /// <param name="cancellationToken">A token to cancel the rollback.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
         /// <exception cref="InvalidOperationException">The transaction was already committed or rolled back.</exception>
         /// <exception cref="ObjectDisposedException">The object was disposed.</exception>
-        public async Task RollbackAsync()
+        public async Task RollbackAsync(CancellationToken cancellationToken = default)
         {
-            await OpenTransaction.RollbackAsync();
+            await OpenTransaction.RollbackAsync(cancellationToken);
             _completed = true;
+        }
+
+        /// <summary>
+        /// Marks a savepoint, so that the work after it can be undone with <see cref="RollbackTo"/> while the transaction stays open.
+        /// </summary>
+        /// <param name="savepointName">A name of up to 32 characters, plain or bracketed, quoted as an identifier. Marking it again moves it.</param>
+        /// <exception cref="ArgumentException">The name is not a valid single name, or is longer than 32 characters.</exception>
+        /// <exception cref="InvalidOperationException">The transaction was already committed or rolled back.</exception>
+        /// <exception cref="ObjectDisposedException">The object was disposed.</exception>
+        public void Save(string savepointName)
+        {
+            string sql = SavepointSql("SAVE", savepointName);
+            _ = OpenTransaction;
+            ExecuteSQL(sql);
+        }
+
+        /// <summary>
+        /// Asynchronously marks a savepoint, so that the work after it can be undone with <see cref="RollbackToAsync"/> while the transaction stays open.
+        /// </summary>
+        /// <param name="savepointName">A name of up to 32 characters, plain or bracketed, quoted as an identifier. Marking it again moves it.</param>
+        /// <param name="cancellationToken">A token to cancel the operation.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        /// <exception cref="ArgumentException">The name is not a valid single name, or is longer than 32 characters.</exception>
+        /// <exception cref="InvalidOperationException">The transaction was already committed or rolled back.</exception>
+        /// <exception cref="ObjectDisposedException">The object was disposed.</exception>
+        public Task SaveAsync(string savepointName, CancellationToken cancellationToken = default)
+        {
+            string sql = SavepointSql("SAVE", savepointName);
+            _ = OpenTransaction;
+            return ExecuteSQLAsync(sql, cancellationToken);
+        }
+
+        /// <summary>
+        /// Undoes the work done since <see cref="Save"/> marked the savepoint. The transaction stays open, and the savepoint can be rolled back to again.
+        /// </summary>
+        /// <param name="savepointName">The name given to <see cref="Save"/>.</param>
+        /// <exception cref="ArgumentException">The name is not a valid single name, or is longer than 32 characters.</exception>
+        /// <exception cref="InvalidOperationException">The transaction was already committed or rolled back.</exception>
+        /// <exception cref="ObjectDisposedException">The object was disposed.</exception>
+        public void RollbackTo(string savepointName)
+        {
+            string sql = SavepointSql("ROLLBACK", savepointName);
+            _ = OpenTransaction;
+            ExecuteSQL(sql);
+        }
+
+        /// <summary>
+        /// Asynchronously undoes the work done since <see cref="SaveAsync"/> marked the savepoint. The transaction stays open, and the savepoint can be rolled back to again.
+        /// </summary>
+        /// <param name="savepointName">The name given to <see cref="SaveAsync"/>.</param>
+        /// <param name="cancellationToken">A token to cancel the operation.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        /// <exception cref="ArgumentException">The name is not a valid single name, or is longer than 32 characters.</exception>
+        /// <exception cref="InvalidOperationException">The transaction was already committed or rolled back.</exception>
+        /// <exception cref="ObjectDisposedException">The object was disposed.</exception>
+        public Task RollbackToAsync(string savepointName, CancellationToken cancellationToken = default)
+        {
+            string sql = SavepointSql("ROLLBACK", savepointName);
+            _ = OpenTransaction;
+            return ExecuteSQLAsync(sql, cancellationToken);
+        }
+
+        /// <summary>The longest savepoint name SQL Server keeps; a longer one is silently cut.</summary>
+        internal const int MaxSavepointNameLength = 32;
+
+        /// <summary>
+        /// <c>SAVE TRANSACTION [name]</c> or <c>ROLLBACK TRANSACTION [name]</c>, with the name quoted.
+        /// </summary>
+        /// <exception cref="ArgumentException">The name is not a valid single name, or is longer than 32 characters.</exception>
+        internal static string SavepointSql(string keyword, string savepointName)
+        {
+            string name = SqlIdentifier.Parse(savepointName, maxParts: 1)[0];
+            if (name.Length > MaxSavepointNameLength)
+                throw new ArgumentException($"A savepoint name can have at most {MaxSavepointNameLength} characters.", nameof(savepointName));
+            return $"{keyword} TRANSACTION {SqlIdentifier.QuotePart(name)}";
         }
 
         /// <summary>

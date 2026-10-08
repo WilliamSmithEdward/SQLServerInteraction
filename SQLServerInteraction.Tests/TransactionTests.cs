@@ -14,6 +14,8 @@ namespace SQLServerInteraction.Tests
 
         private int Count(string table) => (int)Database.Scalar($"SELECT COUNT(*) FROM dbo.{table}")!;
 
+        private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
         private static DataTable Rows(params (int Id, string Name)[] rows)
         {
             var table = new DataTable();
@@ -118,20 +120,22 @@ namespace SQLServerInteraction.Tests
             string table = CreateCustomers();
             string staging = Database.CreateTable("CustomerId int NOT NULL PRIMARY KEY, Name nvarchar(50) NULL, Region nvarchar(20) NULL");
 
-            await using (var transaction = await Db.BeginTransactionAsync(IsolationLevel.ReadCommitted))
+            await using (var transaction = await Db.BeginTransactionAsync(IsolationLevel.ReadCommitted, Ct))
             {
-                await transaction.BulkCopyAsync(Rows((10, "Litware"), (11, "Adatum")), staging);
-                Assert.Equal(2, await transaction.MergeDataAsync(staging, table, ["CustomerId"], ["Name", "Region"]));
-                Assert.Equal(1, await transaction.BulkMergeAsync(Rows((12, "Tailspin")), table, ["CustomerId"]));
+                await transaction.BulkCopyAsync(Rows((10, "Litware"), (11, "Adatum")), staging, cancellationToken: Ct);
+                Assert.Equal(2, await transaction.MergeDataAsync(staging, table, ["CustomerId"], ["Name", "Region"], cancellationToken: Ct));
+                Assert.Equal(1, await transaction.BulkMergeAsync(Rows((12, "Tailspin")), table, ["CustomerId"], cancellationToken: Ct));
                 await transaction.ExecuteNonQueryWithParametersAsync($"UPDATE dbo.{table} SET Region = @Region WHERE CustomerId = @Id",
-                    new Dictionary<string, object> { ["Region"] = "South", ["Id"] = 1 });
-                await transaction.ExecuteParameterizedQueryAsync($"DELETE FROM dbo.{table} WHERE CustomerId = @Id", [new SqlParameter("@Id", 2)]);
-                await transaction.DeleteDataAsync(staging, "1 = 1");
+                    new Dictionary<string, object> { ["Region"] = "South", ["Id"] = 1 }, Ct);
+                await transaction.ExecuteParameterizedQueryAsync($"DELETE FROM dbo.{table} WHERE CustomerId = @Id", [new SqlParameter("@Id", 2)], Ct);
+                await transaction.DeleteDataAsync(staging, "1 = 1", Ct);
+                await transaction.IndexCreateAsync(table, "Region", Ct);
+                await transaction.IndexDropAsync(table, "IX_Region", Ct);
 
-                var rows = await transaction.ExecuteQueryAsync($"SELECT CustomerId FROM dbo.{table} ORDER BY CustomerId");
+                var rows = await transaction.ExecuteQueryAsync($"SELECT CustomerId FROM dbo.{table} ORDER BY CustomerId", Ct);
                 Assert.Equal([1, 10, 11, 12], rows.Rows.Cast<DataRow>().Select(r => (int)r[0]));
 
-                await transaction.CommitAsync();
+                await transaction.CommitAsync(Ct);
             }
 
             Assert.Equal(4, Count(table));
@@ -144,11 +148,11 @@ namespace SQLServerInteraction.Tests
         {
             string table = CreateCustomers();
 
-            await using (var transaction = await Db.BeginTransactionAsync())
+            await using (var transaction = await Db.BeginTransactionAsync(Ct))
             {
-                await transaction.InsertDataAsync(new Customer { CustomerId = 3, Name = "Northwind" }, table);
-                await transaction.ExecuteSQLAsync($"DELETE FROM dbo.{table} WHERE CustomerId = 1");
-                Assert.Equal(2, (await transaction.ExecuteQueryToObjectListAsync<Customer>($"SELECT CustomerId, Name, Region FROM dbo.{table}")).Count);
+                await transaction.InsertDataAsync(new Customer { CustomerId = 3, Name = "Northwind" }, table, Ct);
+                await transaction.ExecuteSQLAsync($"DELETE FROM dbo.{table} WHERE CustomerId = 1", Ct);
+                Assert.Equal(2, (await transaction.ExecuteQueryToObjectListAsync<Customer>($"SELECT CustomerId, Name, Region FROM dbo.{table}", cancellationToken: Ct)).Count);
             }
 
             Assert.Equal(2, Count(table));
@@ -173,6 +177,65 @@ namespace SQLServerInteraction.Tests
             Assert.Equal(2, Count(table));
 
             await Assert.ThrowsAnyAsync<SqlException>(() => Db.ExecuteTransactionAsync([$"DELETE FROM dbo.{table} WHERE CustomerId = 2", "SELECT 1/0"]));
+            Assert.Equal(2, Count(table));
+        }
+
+        [Fact]
+        public void A_savepoint_undoes_the_work_after_it_and_keeps_the_rest()
+        {
+            string table = CreateCustomers();
+
+            using (var transaction = Db.BeginTransaction())
+            {
+                transaction.InsertData(table, new Dictionary<string, object> { ["CustomerId"] = 3, ["Name"] = "Kept" });
+                transaction.Save("after third");
+                transaction.DeleteData(table, "1 = 1");
+                transaction.Save("[after third]"); // the same name again moves the savepoint
+                transaction.InsertData(table, new Dictionary<string, object> { ["CustomerId"] = 4, ["Name"] = "Undone" });
+                transaction.RollbackTo("after third");
+
+                Assert.Equal(0, transaction.ExecuteScalar<int>($"SELECT COUNT(*) FROM dbo.{table}"));
+                transaction.IndexCreate(table, "Name");
+                transaction.Commit();
+            }
+
+            Assert.Equal(0, Count(table));
+            Assert.Equal(["IX_Name"], Db.GetTableIndexs(table));
+        }
+
+        [Fact]
+        public async Task A_savepoint_works_asynchronously_and_refuses_a_bad_name()
+        {
+            string table = CreateCustomers();
+
+            await using var transaction = await Db.BeginTransactionAsync(Ct);
+            await transaction.SaveAsync("start", Ct);
+            await transaction.DeleteDataAsync(table, "1 = 1", Ct);
+            await transaction.RollbackToAsync("start", Ct);
+            Assert.Equal(2, await transaction.ExecuteScalarAsync<int>($"SELECT COUNT(*) FROM dbo.{table}", Ct));
+
+            await Assert.ThrowsAsync<ArgumentException>(() => transaction.SaveAsync(new string('x', 33), Ct));
+            Assert.Throws<ArgumentException>(() => transaction.Save("a.b"));
+            Assert.Throws<ArgumentException>(() => transaction.RollbackTo(""));
+
+            await transaction.CommitAsync(Ct);
+            Assert.Equal(2, Count(table));
+        }
+
+        [Fact]
+        public async Task A_cancelled_token_stops_a_method_and_the_transaction_can_still_roll_back()
+        {
+            string table = CreateCustomers();
+            var cancelled = new CancellationToken(canceled: true);
+
+            await using var transaction = await Db.BeginTransactionAsync(Ct);
+            await transaction.DeleteDataAsync(table, "CustomerId = 1", Ct);
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => transaction.DeleteDataAsync(table, "CustomerId = 2", cancelled));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => transaction.ExecuteQueryAsync($"SELECT * FROM dbo.{table}", cancelled));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Db.BeginTransactionAsync(cancelled));
+
+            await transaction.RollbackAsync(Ct);
             Assert.Equal(2, Count(table));
         }
     }

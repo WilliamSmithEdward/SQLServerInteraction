@@ -18,6 +18,7 @@ unlisted on nuget.org.
 * All four take `useTransaction`, true by default, as `BulkCopy` does.
 * `BeginTransaction` and `BeginTransactionAsync` return a `SQLServerTransaction`: one connection and one transaction on which the queries, commands, inserts, updates, deletes, merges and bulk copies run together, with the same signatures as on `SQLServerInstance`. `Commit` commits; disposing without a commit rolls back. Each takes an optional `IsolationLevel`.
 * `ExecuteTransaction` and `ExecuteTransactionAsync` now run through that object. Their behavior is unchanged.
+* `SQLServerTransaction` also carries `IndexCreate` and `IndexDrop`, with async versions, and savepoints: `Save(name)` marks one and `RollbackTo(name)` undoes the work since it while the transaction stays open. Every async method on it, and `BeginTransactionAsync`, takes an optional `CancellationToken` as its last argument.
 
 ## [2.0.1] - 2026-10-04
 
