@@ -97,7 +97,6 @@ Every method is async and takes an optional `CancellationToken` as its last argu
 
 ## 5. Commands
 
-
 | Method | Effect |
 |---|---|
 | `ExecuteSQLAsync(sql)` | runs the batch |
@@ -109,7 +108,6 @@ Every method is async and takes an optional `CancellationToken` as its last argu
 None return the rows affected.
 
 ## 6. Inserting, updating, deleting
-
 
 | Method | Effect |
 |---|---|
@@ -124,8 +122,8 @@ An empty values dictionary, or a `T` with no usable properties, throws
 ## 7. Merging
 
 ```csharp
-int MergeData(sourceTableName, targetTableName, IEnumerable<string> keyColumns, IEnumerable<string> valueColumns, bool deleteUnmatched = false, bool useTransaction = true)
-int BulkMerge(DataTable dataTable, destinationTableName, IEnumerable<string> keyColumns, bool deleteUnmatched = false, int timeout = 30, int? batchSize = null, bool useTransaction = true)
+Task<int> MergeDataAsync(sourceTableName, targetTableName, IEnumerable<string> keyColumns, IEnumerable<string> valueColumns, bool deleteUnmatched = false, bool useTransaction = true, CancellationToken cancellationToken = default)
+Task<int> BulkMergeAsync(DataTable dataTable, destinationTableName, IEnumerable<string> keyColumns, bool deleteUnmatched = false, int timeout = 30, int? batchSize = null, bool useTransaction = true, CancellationToken cancellationToken = default)
 ```
 
 Both return the rows inserted, updated and
@@ -165,8 +163,8 @@ Rules for both:
 ## 8. Bulk copy
 
 ```csharp
-void BulkCopy(DataTable dataTable, destinationTableName, bool flushTable = false, int bulkCopyTimeout = 30, int? batchSize = null, bool useTransaction = true, string? flushWhereClauseCondition = null)
-void BulkCopy(DataTable dataTable, destinationTableName, bool flushTable, string? flushWhereClauseCondition, Dictionary<string, object>? flushParameters, int bulkCopyTimeout = 30, int? batchSize = null, bool useTransaction = true, IReadOnlyDictionary<string, string>? columnMappings = null)
+Task BulkCopyAsync(DataTable dataTable, destinationTableName, bool flushTable = false, int bulkCopyTimeout = 30, int? batchSize = null, bool useTransaction = true, string? flushWhereClauseCondition = null, CancellationToken cancellationToken = default)
+Task BulkCopyAsync(DataTable dataTable, destinationTableName, bool flushTable, string? flushWhereClauseCondition, Dictionary<string, object>? flushParameters, int bulkCopyTimeout = 30, int? batchSize = null, bool useTransaction = true, IReadOnlyDictionary<string, string>? columnMappings = null, CancellationToken cancellationToken = default)
 ```
 
 `SqlBulkCopy` writes the rows. Without `columnMappings`
@@ -211,7 +209,7 @@ Lifecycle:
 Rules:
 
 - A query on it sees the transaction's own uncommitted work.
-- After an exception from any method, roll back or let the `using` block do
+- After an exception from any method, roll back or let the `await using` block do
   it. Do not catch and carry on to `CommitAsync`: SQL Server fails only the
   statement for some errors (a constraint violation, for one) and leaves the
   transaction open, so the commit would keep the earlier work.
@@ -285,7 +283,7 @@ front of the builder's own SQL.
 
 - Public signatures are frozen for callers within a major version: add an
   overload or a method, never a parameter on an existing public method,
-  optional or not. 3.0.0 was the major version that settled this debt, by
+  optional or not. 3.0.0 made the one such change, by
   making every method async with a token; the next such change waits for 4.0.
 - Every method is implemented once. A data method lives on
   `SQLServerTransaction`, in the file named after it, and the
