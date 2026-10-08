@@ -32,8 +32,12 @@ namespace SQLServerInteraction
     {
         private readonly SqlConnection _connection;
         private readonly SqlTransaction? _transaction;
-        private bool _completed;
+        private string? _closedBecause;
         private bool _disposed;
+
+        private const string Committed = "The transaction has already been committed.";
+        private const string RolledBack = "The transaction has already been rolled back.";
+        private const string CommitFailed = "The commit failed, so the transaction cannot be used again. Dispose it; whatever the server did not commit is rolled back.";
 
         /// <summary>
         /// Over an open connection. With a null transaction the methods run in
@@ -55,8 +59,8 @@ namespace SQLServerInteraction
             get
             {
                 ObjectDisposedException.ThrowIf(_disposed, this);
-                if (_completed)
-                    throw new InvalidOperationException("The transaction has already been committed or rolled back.");
+                if (_closedBecause != null)
+                    throw new InvalidOperationException(_closedBecause);
                 return _transaction;
             }
         }
@@ -72,8 +76,17 @@ namespace SQLServerInteraction
         /// <exception cref="ObjectDisposedException">The object was disposed.</exception>
         public void Commit()
         {
-            OpenTransaction.Commit();
-            _completed = true;
+            var transaction = OpenTransaction;
+            try
+            {
+                transaction.Commit();
+            }
+            catch
+            {
+                _closedBecause = CommitFailed;
+                throw;
+            }
+            _closedBecause = Committed;
         }
 
         /// <summary>
@@ -85,8 +98,17 @@ namespace SQLServerInteraction
         /// <exception cref="ObjectDisposedException">The object was disposed.</exception>
         public async Task CommitAsync(CancellationToken cancellationToken = default)
         {
-            await OpenTransaction.CommitAsync(cancellationToken);
-            _completed = true;
+            var transaction = OpenTransaction;
+            try
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+            catch
+            {
+                _closedBecause = CommitFailed;
+                throw;
+            }
+            _closedBecause = Committed;
         }
 
         /// <summary>
@@ -97,7 +119,7 @@ namespace SQLServerInteraction
         public void Rollback()
         {
             OpenTransaction.Rollback();
-            _completed = true;
+            _closedBecause = RolledBack;
         }
 
         /// <summary>
@@ -110,7 +132,7 @@ namespace SQLServerInteraction
         public async Task RollbackAsync(CancellationToken cancellationToken = default)
         {
             await OpenTransaction.RollbackAsync(cancellationToken);
-            _completed = true;
+            _closedBecause = RolledBack;
         }
 
         /// <summary>
@@ -146,6 +168,11 @@ namespace SQLServerInteraction
         /// <summary>
         /// Undoes the work done since <see cref="Save"/> marked the savepoint. The transaction stays open, and the savepoint can be rolled back to again.
         /// </summary>
+        /// <remarks>
+        /// This works after an error that failed one statement, such as a constraint violation. After an error that
+        /// made the transaction uncommittable, such as a deadlock or a conversion failure, SQL Server refuses to roll
+        /// back to a savepoint, and the exception says so; only a full <see cref="Rollback"/>, or disposing, is left.
+        /// </remarks>
         /// <param name="savepointName">The name given to <see cref="Save"/>.</param>
         /// <exception cref="ArgumentException">The name is not a valid single name, or is longer than 32 characters.</exception>
         /// <exception cref="InvalidOperationException">The transaction was already committed or rolled back.</exception>
@@ -160,6 +187,7 @@ namespace SQLServerInteraction
         /// <summary>
         /// Asynchronously undoes the work done since <see cref="SaveAsync"/> marked the savepoint. The transaction stays open, and the savepoint can be rolled back to again.
         /// </summary>
+        /// <inheritdoc cref="RollbackTo" path="/remarks"/>
         /// <param name="savepointName">The name given to <see cref="SaveAsync"/>.</param>
         /// <param name="cancellationToken">A token to cancel the operation.</param>
         /// <returns>A task representing the asynchronous operation.</returns>

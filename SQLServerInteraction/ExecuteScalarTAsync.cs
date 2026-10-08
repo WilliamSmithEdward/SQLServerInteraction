@@ -19,7 +19,12 @@ namespace SQLServerInteraction
 
     public partial class SQLServerTransaction
     {
-        /// <inheritdoc cref="SQLServerInstance.ExecuteScalarAsync{T}(string)"/>
+        /// <summary>
+        /// Asynchronously executes a SQL query and returns the result as a single value of type T.
+        /// </summary>
+        /// <param name="sql">The SQL query to execute.</param>
+        /// <param name="cancellationToken">A token to cancel the operation.</param>
+        /// <returns>A task representing the asynchronous operation that returns the result of the query as a single value of type T, or the default value of T if the result is null or DBNull.Value.</returns>
         public async Task<T?> ExecuteScalarAsync<T>(string sql, CancellationToken cancellationToken = default)
         {
             using var command = new SqlCommand(sql, _connection, Transaction);

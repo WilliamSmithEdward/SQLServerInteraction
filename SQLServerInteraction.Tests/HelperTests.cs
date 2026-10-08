@@ -64,7 +64,7 @@ namespace SQLServerInteraction.Tests
 
             var (staging, merge) = SQLServerInstance.BulkMergeSql(rows, "dbo.Orders", ["[order id]"], deleteUnmatched: false);
 
-            Assert.Equal("SELECT TOP (0) [Total], [Order Id], [a.b] INTO [#SQLServerInteraction_BulkMerge] FROM [dbo].[Orders]", staging);
+            Assert.Equal("DROP TABLE IF EXISTS [#SQLServerInteraction_BulkMerge]; SELECT TOP (0) [Total], [Order Id], [a.b] INTO [#SQLServerInteraction_BulkMerge] FROM [dbo].[Orders]", staging);
             Assert.Equal(
                 "MERGE INTO [dbo].[Orders] WITH (HOLDLOCK) AS T USING [#SQLServerInteraction_BulkMerge] AS S ON T.[Order Id] = S.[Order Id]" +
                 " WHEN MATCHED THEN UPDATE SET T.[Total] = S.[Total], T.[a.b] = S.[a.b]" +

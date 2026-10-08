@@ -20,7 +20,13 @@ namespace SQLServerInteraction
 
     public partial class SQLServerTransaction
     {
-        /// <inheritdoc cref="SQLServerInstance.ExecuteStoredProcedureAsync(string, SqlParameter[])"/>
+        /// <summary>
+        /// Executes a stored procedure asynchronously in the SQL Server database.
+        /// </summary>
+        /// <param name="storedProcedureName">The name of the stored procedure to execute.</param>
+        /// <param name="parameters">An optional array of SQL parameters to pass to the stored procedure.</param>
+        /// <param name="cancellationToken">A token to cancel the operation.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
         public async Task ExecuteStoredProcedureAsync(string storedProcedureName, SqlParameter[]? parameters = null, CancellationToken cancellationToken = default)
         {
             using var command = new SqlCommand(storedProcedureName, _connection, Transaction);

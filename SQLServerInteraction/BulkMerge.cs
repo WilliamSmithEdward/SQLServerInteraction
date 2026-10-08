@@ -34,7 +34,8 @@ namespace SQLServerInteraction
         /// <summary>
         /// The two statements of a bulk merge, checked before anything runs: the
         /// <c>SELECT TOP (0) ... INTO</c> that gives the staging table the destination's
-        /// column types, and the MERGE from it.
+        /// column types, after dropping one left by an earlier merge on the same connection,
+        /// and the MERGE from it.
         /// </summary>
         /// <exception cref="ArgumentException">The table name or a key column is not a valid name, the DataTable has no columns, there are no key columns, or a key column is not a column of the DataTable.</exception>
         internal static (string Staging, string Merge) BulkMergeSql(DataTable dataTable, string destinationTableName, IEnumerable<string> keyColumns, bool deleteUnmatched)
@@ -57,7 +58,7 @@ namespace SQLServerInteraction
 
             var values = columns.Where(column => !keys.Contains(column, StringComparer.Ordinal)).ToList();
 
-            string staging = $"SELECT TOP (0) {string.Join(", ", columns.Select(SqlIdentifier.QuotePart))} INTO {BulkMergeStagingTable} FROM {target}";
+            string staging = $"DROP TABLE IF EXISTS {BulkMergeStagingTable}; SELECT TOP (0) {string.Join(", ", columns.Select(SqlIdentifier.QuotePart))} INTO {BulkMergeStagingTable} FROM {target}";
             string merge = MergeSql(BulkMergeStagingTable, target, keys.Select(SqlIdentifier.QuotePart).ToList(), values.Select(SqlIdentifier.QuotePart).ToList(), deleteUnmatched);
             return (staging, merge);
         }
