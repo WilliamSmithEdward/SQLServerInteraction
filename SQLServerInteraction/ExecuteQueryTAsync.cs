@@ -19,7 +19,12 @@ namespace SQLServerInteraction
 
     public partial class SQLServerTransaction
     {
-        /// <inheritdoc cref="SQLServerInstance.ExecuteQueryAsync{T}(string)"/>
+        /// <summary>
+        /// Asynchronously executes a SQL query and returns the first column of every row, converted to <typeparamref name="T"/> with Convert.ChangeType. A nullable type such as <c>int?</c> converts to its underlying type, and NULL gives null.
+        /// </summary>
+        /// <param name="sql">The SQL query to execute.</param>
+        /// <param name="cancellationToken">A token to cancel the operation.</param>
+        /// <returns>A task representing the asynchronous operation that returns a list of objects of type <typeparamref name="T"/> containing the results of the query.</returns>
         public async Task<List<T>> ExecuteQueryAsync<T>(string sql, CancellationToken cancellationToken = default)
         {
             var results = new List<T>();

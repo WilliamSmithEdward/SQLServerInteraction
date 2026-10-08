@@ -19,7 +19,12 @@ namespace SQLServerInteraction
 
     public partial class SQLServerTransaction
     {
-        /// <inheritdoc cref="SQLServerInstance.ExecuteQueryAsync(string)"/>
+        /// <summary>
+        /// Asynchronously executes a SQL query and returns the results as a DataTable.
+        /// </summary>
+        /// <param name="sql">The SQL query to execute.</param>
+        /// <param name="cancellationToken">A token to cancel the operation.</param>
+        /// <returns>A DataTable containing the results of the query.</returns>
         public async Task<DataTable> ExecuteQueryAsync(string sql, CancellationToken cancellationToken = default)
         {
             var dataTable = new DataTable();

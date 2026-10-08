@@ -20,7 +20,13 @@ namespace SQLServerInteraction
 
     public partial class SQLServerTransaction
     {
-        /// <inheritdoc cref="SQLServerInstance.ExecuteQueryToObjectListAsync{T}(string, Dictionary{string, object}?)"/>
+        /// <summary>
+        /// Asynchronously executes a SQL query with parameters and maps the result set to a list of objects of type T.
+        /// </summary>
+        /// <param name="sql">The SQL query to execute.</param>
+        /// <param name="parameters">Optional dictionary of SQL parameters. Names work with or without the @, and null is sent as NULL.</param>
+        /// <param name="cancellationToken">A token to cancel the operation.</param>
+        /// <returns>A task representing the asynchronous operation that returns a list of objects of type T populated with data from the query result.</returns>
         public async Task<List<T>> ExecuteQueryToObjectListAsync<T>(string sql, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default) where T : new()
         {
             var results = new List<T>();

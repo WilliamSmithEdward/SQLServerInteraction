@@ -223,6 +223,40 @@ namespace SQLServerInteraction.Tests
         }
 
         [Fact]
+        public async Task BulkMerge_can_run_more_than_once_on_one_transaction()
+        {
+            string table = CreateCustomers();
+
+            await using var transaction = await Db.BeginTransactionAsync(Ct);
+            Assert.Equal(1, transaction.BulkMerge(Rows((3, "Northwind")), table, ["CustomerId"]));
+            Assert.Equal(2, await transaction.BulkMergeAsync(Rows((3, "Northwind Traders"), (4, "Litware")), table, ["CustomerId"], cancellationToken: Ct));
+            Assert.Equal(5, transaction.BulkMerge(Rows((5, "Adatum")), table, ["CustomerId"], deleteUnmatched: true)); // one inserted, four deleted
+            await transaction.CommitAsync(Ct);
+
+            Assert.Equal(1, Count(table));
+            Assert.Equal("Adatum", Database.Scalar($"SELECT Name FROM dbo.{table} WHERE CustomerId = 5"));
+        }
+
+        [Fact]
+        public void A_failed_commit_closes_the_transaction_with_a_reason()
+        {
+            string table = CreateCustomers();
+
+            using var transaction = Db.BeginTransaction();
+            transaction.DeleteData(table, "1 = 1");
+            short spid = transaction.ExecuteScalar<short>("SELECT @@SPID");
+            Database.Execute($"KILL {spid}");
+
+            Assert.ThrowsAny<Exception>(() => transaction.Commit());
+            var afterwards = Assert.Throws<InvalidOperationException>(() => transaction.Rollback());
+            Assert.Contains("commit failed", afterwards.Message);
+            Assert.Throws<InvalidOperationException>(() => transaction.ExecuteScalar<int>("SELECT 1"));
+
+            transaction.Dispose();
+            Assert.Equal(2, Count(table));
+        }
+
+        [Fact]
         public async Task A_cancelled_token_stops_a_method_and_the_transaction_can_still_roll_back()
         {
             string table = CreateCustomers();

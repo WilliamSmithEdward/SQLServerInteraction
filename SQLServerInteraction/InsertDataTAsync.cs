@@ -21,7 +21,14 @@ namespace SQLServerInteraction
 
     public partial class SQLServerTransaction
     {
-        /// <inheritdoc cref="SQLServerInstance.InsertDataAsync{T}(T, string)"/>
+        /// <summary>
+        /// Inserts data into a SQL Server table asynchronously.
+        /// </summary>
+        /// <param name="data">The data to be inserted. A null property value is sent as NULL.</param>
+        /// <param name="sqlServerTableName">The name of the table, such as <c>Sales</c>, <c>dbo.Sales</c> or <c>[dbo].[My Sales]</c>. It is quoted as an identifier.</param>
+        /// <param name="cancellationToken">A token to cancel the operation.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        /// <exception cref="ArgumentException">The table name or a column name is not a valid name, or <typeparamref name="T"/> has no such properties.</exception>
         public async Task InsertDataAsync<T>(T data, string sqlServerTableName, CancellationToken cancellationToken = default) where T : class
         {
             var properties = SQLServerInstance.InsertProperties<T>();
