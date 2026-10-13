@@ -67,6 +67,10 @@ updates:
       minor-and-patch:
         patterns: ["*"]
         update-types: [minor, patch]
+    # SQLServerInteraction.V1Tests runs the 1.x comparison on the 1.1.1
+    # package from nuget.org, so that reference never moves.
+    ignore:
+      - dependency-name: SQLServerInteraction
 
   # The SDK pinned in global.json.
   - package-ecosystem: dotnet-sdk
