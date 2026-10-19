@@ -86,7 +86,8 @@ files that have not changed.
 - **Dependencies:** `dotnet list package --vulnerable --include-transitive`
   checks the packages `packages.lock.json` resolves, after the same locked
   restore CI builds with, and any known vulnerability fails Security. The
-  library depends on Microsoft.Data.SqlClient and Azure.Identity and what
+  library depends on Microsoft.Data.SqlClient and Azure.Identity, with an explicit
+  System.Security.Cryptography.Pkcs 9.0.21 minimum for the transitive dependency, and what
   they bring in.
 - **Malware:** ClamAV, with signatures freshclam fetches and verifies on
   every run, and YARA-X, with the YARA Forge rules pinned to a release and
