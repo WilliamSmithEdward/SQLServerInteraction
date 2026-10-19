@@ -17,6 +17,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Patched floor for the SqlClient transitive PKCS dependency. -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="9.0.21" />
     <PackageReference Include="Azure.Identity" Version="1.21.0" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.1" />
   </ItemGroup>

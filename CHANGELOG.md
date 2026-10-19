@@ -9,6 +9,12 @@ with the date nuget.org records for each upload. Neither nuget.org nor the
 repository carried release notes for them. Versions 1.0.0 to 1.0.18 are
 unlisted on nuget.org.
 
+## Unreleased
+
+- Require System.Security.Cryptography.Pkcs 9.0.21 or later so the SqlClient
+  dependency graph uses the patched package. Keep the 1.1.1 comparison graph
+  unchanged.
+
 ## [3.0.0] - 2026-10-08
 
 The library is async only, every method takes a cancellation token, and there is a merge operation, a bulk copy that merges, and a transaction object on which the data methods run together. `AGENT_PRIMER.md` describes the whole library and every breaking change since 1.x.
