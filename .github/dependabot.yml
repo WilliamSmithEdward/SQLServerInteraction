@@ -71,6 +71,13 @@ updates:
     # package from nuget.org, so that reference never moves.
     ignore:
       - dependency-name: SQLServerInteraction
+      # System.Security.Cryptography.Pkcs is the library's patched floor for
+      # SqlClient's transitive PKCS dependency. The library targets net9.0,
+      # so the floor follows the 9.0 servicing line; a 10.x major would push
+      # every net9.0 caller onto the .NET 10 packages. Security updates
+      # still come through.
+      - dependency-name: System.Security.Cryptography.Pkcs
+        update-types: ["version-update:semver-major"]
 
   # The SDK pinned in global.json.
   - package-ecosystem: dotnet-sdk
