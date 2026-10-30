@@ -1,5 +1,5 @@
 # Dependabot keeps the pinned tools current: the workflows' actions, each
-# pinned to a commit with its release named in a comment, the scanner images
+# pinned to a commit with its release named in a comment, the ClamAV image
 # and the SQL Server image the tests run against, each pinned by digest in a
 # one-line Dockerfile, the pip pins in
 # .github/requirements, which hold the workflow tools, and the NuGet
@@ -27,7 +27,6 @@ updates:
 
   - package-ecosystem: docker
     directories:
-      - /.github/security/semgrep
       - /.github/security/clamav
       - /.github/test/mssql
     schedule:
