@@ -32,9 +32,9 @@
       },
       "System.Security.Cryptography.Pkcs": {
         "type": "Direct",
-        "requested": "[9.0.21, )",
-        "resolved": "9.0.21",
-        "contentHash": "KD+oHoYIxwNCajjVe58WVwq9cRpum+Pg3tRveDRtkcaw6w3oc7sNBoMRtb5P5OehI3bgv1ucMpgjf8lpj5J96A=="
+        "requested": "[9.0.22, )",
+        "resolved": "9.0.22",
+        "contentHash": "pc/KIRHtCS2ZbS+LcdJARNCVOb5zKbD5700swUJr3IvQRQCxMIArW7P0I3qzfJlWtIlYscElEqb4tPmfD3Wa/A=="
       },
       "Azure.Core": {
         "type": "Transitive",
